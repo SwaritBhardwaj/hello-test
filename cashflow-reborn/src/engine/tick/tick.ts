@@ -118,9 +118,33 @@ function applyDecision(state: GameState, action: DecisionAction): string | null 
       const err = sellAsset(state, action.assetId, action.units);
       return err ?? 'Sold asset';
     }
+    case 'take_loan': {
+      const loan = {
+        ...action.loan,
+        id: `loan_${state.liabilities.length + 1}_${state.meta.tick}`,
+        startedAt: state.meta.tick,
+      };
+      state.liabilities.push(loan);
+      return `Took loan: ${action.loan.label}`;
+    }
     case 'prepay_loan': {
       const err = prepayLoan(state, action.loanId, action.amount);
       return err ?? 'Loan prepaid';
+    }
+    case 'adjust_expense': {
+      const line = state.expenses.find((e) => e.category === action.category);
+      if (line) {
+        line.monthlyAmount = Math.max(0, line.monthlyAmount + action.delta);
+      } else if (action.delta > 0) {
+        state.expenses.push({
+          category: action.category,
+          label: `${action.category} (added)`,
+          monthlyAmount: action.delta,
+          inflationIndex: action.category,
+          isVariable: false,
+        });
+      }
+      return `Expense ${action.category} adjusted by ₹${action.delta.toLocaleString('en-IN')}`;
     }
     case 'answer_event': {
       // STUB: record in decisionLog and apply consequence

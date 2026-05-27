@@ -13,9 +13,14 @@ export function computeStatement(state: GameState): FinancialStatement {
   const totalAssets = totalAssetValue(state.assets) + state.cashOnHand;
   const totalLiabilities = state.liabilities.reduce((s, l) => s + l.principalOutstanding, 0);
   const netWorth = totalAssets - totalLiabilities;
+  const assetYieldMonthly = state.assets.reduce(
+    (s, a) => s + (a.currentPrice * a.units * a.yieldRateAnnual) / 12,
+    0,
+  );
   const passiveIncome = state.incomeStreams
     .filter((i) => i.kind !== 'salary' && i.kind !== 'freelance')
-    .reduce((s, i) => s + i.monthlyGross, 0);
+    .reduce((s, i) => s + i.monthlyGross, 0)
+    + assetYieldMonthly;
   const savingsRate = totalIncome === 0 ? 0 : (totalIncome - totalExpenses) / totalIncome;
 
   return {
