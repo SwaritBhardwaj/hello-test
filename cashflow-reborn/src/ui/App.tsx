@@ -646,6 +646,8 @@ function CardModal({ card }: { card: Card }) {
   const resolveWithLoan = useGameStore((s) => s.resolveCardOptionWithLoan);
   const state = useGameStore((s) => s.state)!;
   const t = Math.min(5, Math.max(1, card.temptation));
+  // Max temptation = no resist option. Player must buy (with cash or borrowed).
+  const visibleOptions = t >= 5 ? card.options.filter((o) => o.id !== 'skip') : card.options;
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
@@ -692,8 +694,14 @@ function CardModal({ card }: { card: Card }) {
           <div className="text-xs text-slate-400">
             You have <span className="font-semibold text-slate-700">{formatINR(state.cashOnHand)}</span> in cash.
           </div>
+          {t >= 5 && (
+            <div className="bg-rose-100 border-2 border-rose-300 rounded-lg px-3 py-2 text-xs text-rose-800 font-semibold flex items-center gap-2">
+              <span className="text-base">🔥</span>
+              <span>You can't walk away from this one. {visibleOptions.length === 1 ? "It's happening." : 'Pick how you pay.'}</span>
+            </div>
+          )}
           <div className="space-y-2 pt-2">
-            {card.options.map((o) => {
+            {visibleOptions.map((o) => {
               const cantAfford = o.affordCheck?.(state);
               const isResist = o.id === 'skip';
               const isBuy = !isResist;
@@ -726,7 +734,7 @@ function CardModal({ card }: { card: Card }) {
                       onClick={() => resolveWithLoan(o.id, 'personal')}
                     >
                       <div className="text-sm font-semibold text-rose-700">
-                        🏦 Borrow ₹{borrowAmount.toLocaleString('en-IN')} & buy
+                        🏦 Borrow ₹{borrowAmount.toLocaleString('en-IN')} & buy {t >= 5 && <span className="ml-1 text-[10px] bg-rose-700 text-white rounded px-1.5 py-0.5">FORCED</span>}
                       </div>
                       <div className="text-xs text-rose-600 mt-0.5">
                         Personal loan @ 13.5% p.a., 3yr · The card never sleeps
