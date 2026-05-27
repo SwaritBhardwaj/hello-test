@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useGameStore, DAYS_IN_MONTH } from './store';
+import { useGameStore, DAYS_IN_MONTH, BANKRUPTCY_GRACE_MONTHS, trailingNegativeCashMonths } from './store';
 import { formatINR } from '@/utils/money';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { LOAN_RATES } from '@/data/constants';
@@ -211,6 +211,8 @@ function BoardScreen() {
   const lastRoll = useGameStore((s) => s.lastRoll);
   const cardCells = useGameStore((s) => s.cardCells);
   const currentCard = useGameStore((s) => s.currentCard);
+  const gameStatus = useGameStore((s) => s.gameStatus);
+  const outcomeDismissed = useGameStore((s) => s.outcomeDismissed);
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const chartData = state.history.map((h) => ({ tick: h.tick, netWorth: h.netWorth, cash: h.cashOnHand }));
@@ -220,6 +222,9 @@ function BoardScreen() {
   const passiveCoverage = state.statement.totalExpenses
     ? state.statement.passiveIncome / state.statement.totalExpenses
     : 0;
+  const negMonths = trailingNegativeCashMonths(state);
+  const monthsToBankruptcy = Math.max(0, BANKRUPTCY_GRACE_MONTHS - negMonths);
+  const showOutcomeModal = gameStatus !== 'playing' && !outcomeDismissed;
 
   return (
     <div className="min-h-screen felt p-4 md:p-6 space-y-4">
@@ -261,6 +266,23 @@ function BoardScreen() {
         </div>
       </header>
 
+      {/* Win progress bar — the goal of the whole game */}
+      <FreedomBar
+        passive={state.statement.passiveIncome}
+        expenses={state.statement.totalExpenses}
+        coverage={passiveCoverage}
+        won={gameStatus === 'won'}
+      />
+
+      {/* Bankruptcy warning (only when in danger) */}
+      {negMonths > 0 && gameStatus === 'playing' && (
+        <BankruptcyWarning
+          monthsNegative={negMonths}
+          monthsToBankruptcy={monthsToBankruptcy}
+          cashOnHand={state.cashOnHand}
+        />
+      )}
+
       {/* The board (day track) */}
       <section className="bg-emerald-900/30 rounded-2xl p-4 ring-4 ring-amber-700/40 shadow-inner">
         <div className="flex items-center justify-between mb-3">
@@ -291,14 +313,14 @@ function BoardScreen() {
       {/* Stats row */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Net worth" value={formatINR(state.statement.netWorth, { compact: true })} accent="emerald" />
-        <Stat label="Cash on hand" value={formatINR(state.cashOnHand, { compact: true })} accent="amber" />
-        <Stat label="Monthly passive" value={formatINR(state.statement.passiveIncome, { compact: true })} />
         <Stat
-          label="Passive/Expenses"
-          value={`${(passiveCoverage * 100).toFixed(0)}%`}
-          accent={passiveCoverage >= 1 ? 'emerald' : undefined}
-          hint={passiveCoverage >= 1 ? '🏆 RAT RACE ESCAPED' : 'goal: 100%'}
+          label="Cash on hand"
+          value={formatINR(state.cashOnHand, { compact: true })}
+          accent={state.cashOnHand < 0 ? undefined : 'amber'}
+          hint={state.cashOnHand < 0 ? '⚠️ overdrawn' : undefined}
         />
+        <Stat label="Monthly income" value={formatINR(state.statement.totalIncome, { compact: true })} />
+        <Stat label="Monthly expenses" value={formatINR(state.statement.totalExpenses, { compact: true })} />
       </section>
 
       {/* Chart + notifications */}
@@ -331,6 +353,230 @@ function BoardScreen() {
 
       {currentCard && <CardModal card={currentCard} />}
       {sheetOpen && <BalanceSheetDrawer onClose={() => setSheetOpen(false)} />}
+      {showOutcomeModal && <OutcomeModal status={gameStatus} />}
+    </div>
+  );
+}
+
+// ============================================================
+// Freedom progress bar (the goal of the whole game)
+// ============================================================
+function FreedomBar({
+  passive,
+  expenses,
+  coverage,
+  won,
+}: {
+  passive: number;
+  expenses: number;
+  coverage: number;
+  won: boolean;
+}) {
+  const pct = Math.min(150, coverage * 100); // allow some overshoot visually
+  const fillPct = Math.min(100, pct);
+  const colorClass = won
+    ? 'from-amber-300 via-yellow-400 to-amber-300'
+    : coverage >= 0.75
+      ? 'from-emerald-400 to-emerald-600'
+      : coverage >= 0.40
+        ? 'from-amber-300 to-amber-500'
+        : 'from-rose-300 to-rose-500';
+
+  return (
+    <section className={`rounded-2xl p-4 shadow-lg ring-2 ${won ? 'bg-gradient-to-r from-amber-100 to-yellow-50 ring-amber-400 animate-pulse-slow' : 'bg-white/95 ring-amber-700/30'}`}>
+      <div className="flex items-baseline justify-between mb-2">
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-slate-500 font-bold">Path to Financial Freedom</div>
+          <div className="text-sm text-slate-700">
+            Passive income <span className="font-bold text-emerald-700">{formatINR(passive, { compact: true })}</span>
+            <span className="text-slate-400 mx-2">vs</span>
+            Monthly expenses <span className="font-bold text-rose-700">{formatINR(expenses, { compact: true })}</span>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className={`text-2xl font-bold ${won ? 'text-amber-600' : coverage >= 0.5 ? 'text-emerald-700' : 'text-slate-700'}`}>
+            {Math.round(pct)}%
+          </div>
+          {won && <div className="text-xs text-amber-700 font-semibold">🏆 RAT RACE ESCAPED</div>}
+          {!won && <div className="text-[10px] text-slate-500">Win at 100%</div>}
+        </div>
+      </div>
+      <div className="relative bg-slate-200 rounded-full h-5 overflow-hidden ring-1 ring-slate-300">
+        <div
+          className={`h-full bg-gradient-to-r ${colorClass} transition-all duration-700 ease-out`}
+          style={{ width: `${fillPct}%` }}
+        />
+        {/* Markers */}
+        {[25, 50, 75].map((m) => (
+          <div
+            key={m}
+            className="absolute top-0 bottom-0 w-px bg-white/60"
+            style={{ left: `${m}%` }}
+          />
+        ))}
+        {/* 100% finish line */}
+        <div className="absolute top-0 bottom-0 w-1 bg-amber-600 shadow" style={{ left: 'calc(100% - 2px)' }} />
+      </div>
+      <div className="flex justify-between text-[10px] text-slate-400 mt-1 px-0.5">
+        <span>0</span>
+        <span>25%</span>
+        <span>50%</span>
+        <span>75%</span>
+        <span className="text-amber-700 font-bold">🏁 100%</span>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================
+// Bankruptcy warning
+// ============================================================
+function BankruptcyWarning({
+  monthsNegative,
+  monthsToBankruptcy,
+  cashOnHand,
+}: {
+  monthsNegative: number;
+  monthsToBankruptcy: number;
+  cashOnHand: number;
+}) {
+  const dangerPct = (monthsNegative / BANKRUPTCY_GRACE_MONTHS) * 100;
+  return (
+    <section className="bg-gradient-to-r from-rose-900 to-red-800 text-white rounded-2xl p-4 shadow-lg ring-2 ring-rose-400 animate-pulse-fast">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">⚠️</span>
+          <div>
+            <div className="font-bold text-base">CASH OVERDRAWN</div>
+            <div className="text-xs opacity-90">
+              {formatINR(cashOnHand, { compact: true })} in the red · month {monthsNegative} of {BANKRUPTCY_GRACE_MONTHS}
+            </div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-2xl font-bold">{monthsToBankruptcy}</div>
+          <div className="text-[10px] uppercase tracking-wider opacity-90">months to bankruptcy</div>
+        </div>
+      </div>
+      <div className="bg-rose-950/50 rounded-full h-2 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-rose-400 to-red-500 transition-all duration-500"
+          style={{ width: `${dangerPct}%` }}
+        />
+      </div>
+      <div className="text-[11px] mt-1.5 opacity-90 italic">
+        Sell assets, pay off high-rate debt, or cut expenses — fast.
+      </div>
+    </section>
+  );
+}
+
+// ============================================================
+// Outcome modal — win or lose
+// ============================================================
+function OutcomeModal({ status }: { status: 'won' | 'lost' }) {
+  const dismiss = useGameStore((s) => s.dismissOutcome);
+  const reset = useGameStore((s) => s.reset);
+  const state = useGameStore((s) => s.state)!;
+  const years = Math.floor(state.meta.tick / 12);
+  const months = state.meta.tick % 12;
+
+  if (status === 'won') {
+    return (
+      <div className="fixed inset-0 bg-amber-900/70 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+        <div className="bg-gradient-to-br from-amber-50 via-yellow-50 to-amber-100 rounded-2xl shadow-2xl max-w-md w-full ring-4 ring-amber-500 animate-card-in">
+          <div className="bg-gradient-to-r from-amber-600 to-yellow-500 text-white rounded-t-xl px-6 py-5 text-center">
+            <div className="text-6xl mb-2">🏆</div>
+            <div className="text-2xl font-bold">Rat Race Escaped!</div>
+            <div className="text-sm opacity-95 mt-1">
+              {state.player.name} achieved financial freedom in {years}y {months}m
+            </div>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="bg-white/70 rounded-lg p-3 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Net worth</span>
+                <span className="font-bold text-emerald-700">{formatINR(state.statement.netWorth)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Passive income</span>
+                <span className="font-bold text-emerald-700">{formatINR(state.statement.passiveIncome)}/mo</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Monthly expenses</span>
+                <span className="font-mono">{formatINR(state.statement.totalExpenses)}/mo</span>
+              </div>
+            </div>
+            <p className="text-sm text-slate-600 italic text-center">
+              "Your money works for you now. Time is yours."
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={dismiss}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-3 rounded-lg font-semibold"
+              >
+                Keep playing
+              </button>
+              <button
+                onClick={reset}
+                className="w-full bg-white border-2 border-amber-300 hover:bg-amber-50 text-amber-800 px-4 py-2.5 rounded-lg font-semibold"
+              >
+                🎲 Start a new run
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // lost
+  return (
+    <div className="fixed inset-0 bg-rose-950/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+      <div className="bg-gradient-to-br from-rose-50 to-white rounded-2xl shadow-2xl max-w-md w-full ring-4 ring-rose-500 animate-card-in">
+        <div className="bg-gradient-to-r from-rose-700 to-red-700 text-white rounded-t-xl px-6 py-5 text-center">
+          <div className="text-6xl mb-2">💸</div>
+          <div className="text-2xl font-bold">Bankrupt</div>
+          <div className="text-sm opacity-95 mt-1">
+            {state.player.name} ran out of cash for {BANKRUPTCY_GRACE_MONTHS} straight months
+          </div>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="bg-white rounded-lg p-3 space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-500">Final cash</span>
+              <span className="font-bold text-rose-700">{formatINR(state.cashOnHand)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Final net worth</span>
+              <span className={`font-bold ${state.statement.netWorth < 0 ? 'text-rose-700' : ''}`}>
+                {formatINR(state.statement.netWorth)}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-500">Survived</span>
+              <span className="font-mono">{years}y {months}m</span>
+            </div>
+          </div>
+          <p className="text-sm text-slate-600 italic text-center">
+            "The EMIs kept coming. The salary couldn't."
+          </p>
+          <div className="space-y-2">
+            <button
+              onClick={reset}
+              className="w-full bg-rose-700 hover:bg-rose-800 text-white px-4 py-3 rounded-lg font-semibold"
+            >
+              🎲 Start a new run
+            </button>
+            <button
+              onClick={dismiss}
+              className="w-full bg-white border-2 border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-lg text-sm"
+            >
+              Continue (view the wreckage)
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

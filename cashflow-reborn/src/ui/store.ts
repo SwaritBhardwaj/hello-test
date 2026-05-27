@@ -3,6 +3,7 @@ import type { GameState, TickInput, DecisionAction } from '@/types';
 import { tick, buildInitialState, type SetupOptions, PRNG } from '@/engine';
 import { drawRandomCard, type Card, type CardOption } from '@/modules/cards/cards';
 import { buildLoan } from '@/modules/loans/loans';
+import { computeStatement } from '@/modules/dashboard/statement';
 
 const DAYS_PER_MONTH = 30;
 const CARD_CELLS_PER_MONTH = 7;
@@ -16,6 +17,11 @@ function rollCardCells(seed: number): number[] {
   return [...cells].sort((a, b) => a - b);
 }
 
+export type GameStatus = 'playing' | 'won' | 'lost';
+
+/** Months of running cash < 0 before bankruptcy triggers. */
+export const BANKRUPTCY_GRACE_MONTHS = 6;
+
 interface GameStore {
   state: GameState | null;
   notifications: string[];
@@ -26,6 +32,9 @@ interface GameStore {
   cardCells: number[];          // day indices that draw a card
   currentCard: Card | null;
   pendingCardCells: number[];   // queue of card cells crossed but not yet drawn
+  // Outcome
+  gameStatus: GameStatus;
+  outcomeDismissed: boolean;    // user clicked "Keep playing" on a status modal
   // Actions
   initGame: (opts: SetupOptions) => void;
   rollDice: () => void;
@@ -35,6 +44,7 @@ interface GameStore {
   step: (actions?: DecisionAction[]) => void;
   fastForward: (months: number) => void;
   applyAction: (action: DecisionAction) => void;
+  dismissOutcome: () => void;
   reset: () => void;
 }
 
@@ -49,6 +59,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   cardCells: [],
   currentCard: null,
   pendingCardCells: [],
+  gameStatus: 'playing',
+  outcomeDismissed: false,
 
   initGame: (opts) => {
     const state = buildInitialState(opts);
@@ -60,6 +72,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       cardCells: rollCardCells(opts.seed),
       currentCard: null,
       pendingCardCells: [],
+      gameStatus: 'playing',
+      outcomeDismissed: false,
     });
   },
 
@@ -92,6 +106,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         cardCells: rollCardCells(nextSeed),
         pendingCardCells: crossed,
         isRolling: false,
+        gameStatus: evaluateGameStatus(result.state, s.gameStatus),
       });
     } else {
       set({
@@ -119,10 +134,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Clone state, mutate, set back
     const cloned: GameState = JSON.parse(JSON.stringify(s.state));
     const note = applyOption(cloned, opt);
+    cloned.statement = computeStatement(cloned);
     set({
       state: cloned,
       notifications: [...s.notifications, `🃏 ${note}`].slice(-25),
       currentCard: null,
+      gameStatus: evaluateGameStatus(cloned, s.gameStatus),
     });
     // Draw next pending if any
     setTimeout(() => drawNextCard(), 200);
@@ -151,6 +168,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
     cloned.cashOnHand += principal;
     const note = applyOption(cloned, opt);
+    cloned.statement = computeStatement(cloned);
     set({
       state: cloned,
       notifications: [
@@ -159,6 +177,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         `🃏 ${note}`,
       ].slice(-25),
       currentCard: null,
+      gameStatus: evaluateGameStatus(cloned, s.gameStatus),
     });
     setTimeout(() => drawNextCard(), 200);
   },
@@ -179,6 +198,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       notifications: [...get().notifications, ...result.notifications].slice(-25),
       cardCells: rollCardCells(nextSeed),
       dayPosition: 0,
+      gameStatus: evaluateGameStatus(result.state, get().gameStatus),
     });
   },
 
@@ -187,10 +207,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!cur) return;
     let s = cur;
     const allNotes: string[] = [];
+    let status = get().gameStatus;
     for (let i = 0; i < months; i++) {
       const r = tick(s, { actions: [] });
       s = r.state;
       allNotes.push(...r.notifications);
+      // Stop fast-forwarding immediately if outcome reached
+      status = evaluateGameStatus(s, status);
+      if (status !== 'playing') break;
     }
     const nextSeed = (s.meta.seed + s.meta.tick * 1009) >>> 0;
     set({
@@ -198,6 +222,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       notifications: [...get().notifications, `⏩ Fast-forwarded ${months} months`, ...allNotes].slice(-25),
       cardCells: rollCardCells(nextSeed),
       dayPosition: 0,
+      gameStatus: status,
     });
   },
 
@@ -206,11 +231,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!s.state) return;
     const cloned: GameState = JSON.parse(JSON.stringify(s.state));
     const note = applyDecisionDirect(cloned, action);
+    cloned.statement = computeStatement(cloned);
     set({
       state: cloned,
       notifications: [...s.notifications, note ?? '...'].slice(-25),
+      gameStatus: evaluateGameStatus(cloned, s.gameStatus),
     });
   },
+
+  dismissOutcome: () => set({ outcomeDismissed: true }),
 
   reset: () =>
     set({
@@ -221,8 +250,41 @@ export const useGameStore = create<GameStore>((set, get) => ({
       cardCells: [],
       currentCard: null,
       pendingCardCells: [],
+      gameStatus: 'playing',
+      outcomeDismissed: false,
     }),
 }));
+
+// Expose store in dev for manual testing/automation
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+  (window as unknown as { __game: typeof useGameStore }).__game = useGameStore;
+}
+
+/** Evaluate win/loss conditions from the current state. */
+export function evaluateGameStatus(state: GameState | null, currentStatus: GameStatus): GameStatus {
+  if (!state || currentStatus !== 'playing') return currentStatus;
+  // Win: passive income covers monthly expenses (Rat Race escaped)
+  if (state.statement.passiveIncome >= state.statement.totalExpenses && state.statement.totalExpenses > 0) {
+    return 'won';
+  }
+  // Lose: 6 consecutive months ending in negative cash
+  const last = state.history.slice(-BANKRUPTCY_GRACE_MONTHS);
+  if (last.length >= BANKRUPTCY_GRACE_MONTHS && last.every((h) => h.cashOnHand < 0)) {
+    return 'lost';
+  }
+  return 'playing';
+}
+
+/** Count trailing months of negative cash (for the "bankruptcy in N months" warning). */
+export function trailingNegativeCashMonths(state: GameState | null): number {
+  if (!state) return 0;
+  let count = 0;
+  for (let i = state.history.length - 1; i >= 0; i--) {
+    if (state.history[i].cashOnHand < 0) count++;
+    else break;
+  }
+  return count;
+}
 
 function drawNextCard() {
   const s = useGameStore.getState();
