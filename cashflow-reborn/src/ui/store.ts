@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { GameState, TickInput, DecisionAction } from '@/types';
 import { tick, buildInitialState, type SetupOptions, PRNG } from '@/engine';
 import { drawRandomCard, type Card, type CardOption } from '@/modules/cards/cards';
+import { buildLoan } from '@/modules/loans/loans';
 
 const DAYS_PER_MONTH = 30;
 const CARD_CELLS_PER_MONTH = 7;
@@ -29,6 +30,7 @@ interface GameStore {
   initGame: (opts: SetupOptions) => void;
   rollDice: () => void;
   resolveCardOption: (optionId: string) => void;
+  resolveCardOptionWithLoan: (optionId: string, loanKind?: 'personal' | 'credit_card') => void;
   closeCard: () => void;
   step: (actions?: DecisionAction[]) => void;
   fastForward: (months: number) => void;
@@ -123,6 +125,41 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentCard: null,
     });
     // Draw next pending if any
+    setTimeout(() => drawNextCard(), 200);
+  },
+
+  resolveCardOptionWithLoan: (optionId, loanKind = 'personal') => {
+    const s = get();
+    if (!s.state || !s.currentCard) return;
+    const opt = s.currentCard.options.find((o) => o.id === optionId);
+    if (!opt || !opt.cashCost) return;
+    const cloned: GameState = JSON.parse(JSON.stringify(s.state));
+    const shortfall = Math.max(0, opt.cashCost - cloned.cashOnHand);
+    // Round shortfall up to nearest 10k for clean loan amounts
+    const principal = Math.ceil(shortfall / 10_000) * 10_000;
+    const tenureMonths = loanKind === 'credit_card' ? 6 : 36;
+    const loan = buildLoan({
+      kind: loanKind,
+      label: `Loan for ${s.currentCard.title}`,
+      principal,
+      tenureMonths,
+    });
+    cloned.liabilities.push({
+      ...loan,
+      id: `loan_${cloned.liabilities.length + 1}_${cloned.meta.tick}`,
+      startedAt: cloned.meta.tick,
+    });
+    cloned.cashOnHand += principal;
+    const note = applyOption(cloned, opt);
+    set({
+      state: cloned,
+      notifications: [
+        ...s.notifications,
+        `🏦 Borrowed ₹${principal.toLocaleString('en-IN')} (${loanKind}, EMI ₹${loan.emi.toLocaleString('en-IN')}/mo)`,
+        `🃏 ${note}`,
+      ].slice(-25),
+      currentCard: null,
+    });
     setTimeout(() => drawNextCard(), 200);
   },
 

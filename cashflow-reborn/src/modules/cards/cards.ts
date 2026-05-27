@@ -22,6 +22,9 @@ export interface CardOption {
   detail?: string;
   apply: (state: GameState) => string;
   affordCheck?: (state: GameState) => string | null;
+  /** Cash needed for this option. If set and cash < cashCost, the UI offers a
+   *  "Borrow & buy" alternative that takes a personal loan to cover the gap. */
+  cashCost?: number;
 }
 
 export interface Card {
@@ -33,6 +36,10 @@ export interface Card {
   description: string;
   rows?: { label: string; value: string }[];
   options: CardOption[];
+  /** 1 = barely tempting, 5 = "you NEED this". UX nudge only. */
+  temptation: number;
+  /** One-line flavor explaining the temptation. */
+  temptationReason: string;
 }
 
 const lakh = 100_000;
@@ -141,6 +148,7 @@ function realEstateCard(state: GameState, rng: PRNG): Card {
       {
         id: 'cash',
         label: `Buy outright (₹${(price / lakh).toFixed(1)}L + ₹${(closingCosts / lakh).toFixed(1)}L costs)`,
+        cashCost: price + closingCosts,
         affordCheck: (s) =>
           s.cashOnHand < price + closingCosts
             ? `Need ₹${((price + closingCosts) / lakh).toFixed(1)}L cash`
@@ -161,6 +169,7 @@ function realEstateCard(state: GameState, rng: PRNG): Card {
       {
         id: 'loan',
         label: `Buy with ₹${(totalCash / lakh).toFixed(1)}L down + home loan`,
+        cashCost: totalCash,
         detail: `EMI ₹${homeEMI.toLocaleString('en-IN')}/mo · cashflow ${
           monthlyRent - homeEMI >= 0 ? '+' : ''
         }₹${(monthlyRent - homeEMI).toLocaleString('en-IN')}/mo`,
@@ -188,6 +197,8 @@ function realEstateCard(state: GameState, rng: PRNG): Card {
       },
       { id: 'skip', label: 'Pass', apply: () => 'Passed on deal' },
     ],
+    temptation: isCommercial ? 3 : 4,
+    temptationReason: 'Property! Your uncle says it always doubles. Your spouse already mentally lives there.',
   };
 }
 
@@ -223,6 +234,7 @@ function stockCard(state: GameState, rng: PRNG): Card {
       {
         id: 'buy',
         label: `Buy ${lotSize} shares (₹${totalCost.toLocaleString('en-IN')})`,
+        cashCost: totalCost,
         affordCheck: (s) => (s.cashOnHand < totalCost ? 'Insufficient cash' : null),
         apply: (s) => {
           s.cashOnHand -= totalCost;
@@ -238,6 +250,8 @@ function stockCard(state: GameState, rng: PRNG): Card {
       },
       { id: 'skip', label: 'Pass', apply: () => 'Passed on stock' },
     ],
+    temptation: 3,
+    temptationReason: 'A friend on WhatsApp says this is going to 5x by year-end. The chart looks bullish.',
   };
 }
 
@@ -269,6 +283,7 @@ function indexFundCard(state: GameState, rng: PRNG): Card {
       {
         id: 'buy',
         label: `Buy ${units} units (₹${cost.toLocaleString('en-IN')})`,
+        cashCost: cost,
         affordCheck: (s) => (s.cashOnHand < cost ? 'Insufficient cash' : null),
         apply: (s) => {
           s.cashOnHand -= cost;
@@ -284,6 +299,8 @@ function indexFundCard(state: GameState, rng: PRNG): Card {
       },
       { id: 'skip', label: 'Pass', apply: () => 'Passed' },
     ],
+    temptation: 2,
+    temptationReason: 'The boring sensible choice. No dopamine, just compounding.',
   };
 }
 
@@ -307,6 +324,7 @@ function goldCard(state: GameState, rng: PRNG): Card {
       {
         id: 'buy',
         label: `Buy ${grams}g (₹${cost.toLocaleString('en-IN')})`,
+        cashCost: cost,
         affordCheck: (s) => (s.cashOnHand < cost ? 'Insufficient cash' : null),
         apply: (s) => {
           s.cashOnHand -= cost;
@@ -322,6 +340,8 @@ function goldCard(state: GameState, rng: PRNG): Card {
       },
       { id: 'skip', label: 'Pass', apply: () => 'Passed' },
     ],
+    temptation: 2,
+    temptationReason: 'Your mom keeps reminding you that gold has never let her down.',
   };
 }
 
@@ -351,6 +371,7 @@ function businessCard(state: GameState, rng: PRNG): Card {
       {
         id: 'buy',
         label: `Invest ₹${(pick.cost / lakh).toFixed(1)}L`,
+        cashCost: pick.cost,
         affordCheck: (s) => (s.cashOnHand < pick.cost ? 'Insufficient cash' : null),
         apply: (s) => {
           s.cashOnHand -= pick.cost;
@@ -366,20 +387,24 @@ function businessCard(state: GameState, rng: PRNG): Card {
       },
       { id: 'skip', label: 'Pass', apply: () => 'Passed' },
     ],
+    temptation: 3,
+    temptationReason: 'Imagine the LinkedIn announcement. Imagine quitting your job.',
   };
 }
 
 function doodadCard(state: GameState, rng: PRNG): Card {
   const doodads = [
-    { name: 'New iPhone Pro', cash: 1_50_000, monthly: 0, emoji: '📱' },
-    { name: 'Weekend in Goa', cash: 35_000, monthly: 0, emoji: '🏖️' },
-    { name: 'Smart TV upgrade', cash: 85_000, monthly: 0, emoji: '📺' },
-    { name: 'Wardrobe refresh', cash: 25_000, monthly: 0, emoji: '👗' },
-    { name: 'Gym membership', cash: 0, monthly: 3500, emoji: '💪' },
-    { name: 'Streaming bundle', cash: 0, monthly: 1200, emoji: '🎬' },
-    { name: 'Fancy dining out', cash: 0, monthly: 6000, emoji: '🍽️' },
-    { name: 'Designer handbag', cash: 65_000, monthly: 0, emoji: '👜' },
-    { name: 'Two-wheeler upgrade', cash: 1_80_000, monthly: 0, emoji: '🛵' },
+    { name: 'New iPhone Pro', cash: 1_50_000, monthly: 0, emoji: '📱', temptation: 5, reason: 'Your colleague pulled theirs out at lunch. Yours is suddenly embarrassing.' },
+    { name: 'Weekend in Goa', cash: 35_000, monthly: 0, emoji: '🏖️', temptation: 4, reason: 'You\'ve been working hard. You DESERVE this. (Do you?)' },
+    { name: 'Smart TV upgrade', cash: 85_000, monthly: 0, emoji: '📺', temptation: 3, reason: 'The new one is OLED. The current one is fine, but… OLED.' },
+    { name: 'Wardrobe refresh', cash: 25_000, monthly: 0, emoji: '👗', temptation: 3, reason: 'Festive sale. 70% off. Limited stock. (Always limited.)' },
+    { name: 'Gym membership', cash: 0, monthly: 3500, emoji: '💪', temptation: 4, reason: 'This is the year. You\'re absolutely going to use it. Definitely.' },
+    { name: 'Streaming bundle', cash: 0, monthly: 1200, emoji: '🎬', temptation: 3, reason: 'It\'s ONLY ₹1200/mo. What\'s ₹1200/mo? (₹4.3L over 30 years.)' },
+    { name: 'Fancy dining out', cash: 0, monthly: 6000, emoji: '🍽️', temptation: 4, reason: 'Date night, work dinners, weekend brunches. It\'s the lifestyle.' },
+    { name: 'Designer handbag', cash: 65_000, monthly: 0, emoji: '👜', temptation: 4, reason: 'It\'s an investment. Bags hold value. (Spoiler: they mostly don\'t.)' },
+    { name: 'Two-wheeler upgrade', cash: 1_80_000, monthly: 0, emoji: '🛵', temptation: 5, reason: 'The salesperson just let you sit on it. Game over.' },
+    { name: 'Crypto plunge (memecoin)', cash: 40_000, monthly: 0, emoji: '🪙', temptation: 5, reason: 'A stranger on Twitter just 100x\'d. Your turn?' },
+    { name: 'New car (downpayment)', cash: 3_00_000, monthly: 0, emoji: '🚗', temptation: 5, reason: 'Your old car still works. But the new one has VENTILATED SEATS.' },
   ];
   const pick = doodads[Math.floor(rng.next() * doodads.length)];
   const description = pick.monthly > 0
@@ -399,6 +424,7 @@ function doodadCard(state: GameState, rng: PRNG): Card {
       {
         id: 'buy',
         label: pick.monthly > 0 ? 'Subscribe' : 'Buy it',
+        cashCost: pick.cash > 0 ? pick.cash : undefined,
         affordCheck: (s) => (pick.cash > 0 && s.cashOnHand < pick.cash ? 'Insufficient cash' : null),
         apply: (s) => {
           if (pick.cash > 0) s.cashOnHand -= pick.cash;
@@ -417,9 +443,18 @@ function doodadCard(state: GameState, rng: PRNG): Card {
           return `Bought: ${pick.name}`;
         },
       },
-      { id: 'skip', label: 'Resist', apply: () => `Resisted ${pick.name}` },
+      { id: 'skip', label: resistLabel(pick.temptation), apply: () => `Resisted ${pick.name}` },
     ],
+    temptation: pick.temptation,
+    temptationReason: pick.reason,
   };
+}
+
+function resistLabel(temptation: number): string {
+  if (temptation >= 5) return 'Resist (almost impossible)';
+  if (temptation >= 4) return 'Resist (hard)';
+  if (temptation >= 3) return 'Resist';
+  return 'Pass';
 }
 
 function sideHustleCard(state: GameState, rng: PRNG): Card {
@@ -458,6 +493,8 @@ function sideHustleCard(state: GameState, rng: PRNG): Card {
       },
       { id: 'skip', label: 'Decline', apply: () => 'Declined gig' },
     ],
+    temptation: 3,
+    temptationReason: 'Easy extra income… but evenings and weekends are not free.',
   };
 }
 
@@ -484,6 +521,8 @@ function unseenExpenseCard(state: GameState, rng: PRNG): Card {
       {
         id: 'pay',
         label: 'Pay from cash',
+        cashCost: pick.cost,
+        affordCheck: (s) => (s.cashOnHand < pick.cost ? `Need ₹${pick.cost.toLocaleString('en-IN')}` : null),
         apply: (s) => {
           s.cashOnHand -= pick.cost;
           return `Paid ₹${pick.cost.toLocaleString('en-IN')} for ${pick.name}`;
@@ -491,7 +530,7 @@ function unseenExpenseCard(state: GameState, rng: PRNG): Card {
       },
       {
         id: 'cc',
-        label: 'Put on credit card',
+        label: 'Put on credit card (36% p.a.)',
         apply: (s) => {
           const emi = pushLoan(s, {
             kind: 'credit_card',
@@ -502,7 +541,22 @@ function unseenExpenseCard(state: GameState, rng: PRNG): Card {
           return `On credit card @ 36% — EMI ₹${emi.toLocaleString('en-IN')}/mo`;
         },
       },
+      {
+        id: 'personal',
+        label: 'Personal loan (13.5% p.a., 3yr)',
+        apply: (s) => {
+          const emi = pushLoan(s, {
+            kind: 'personal',
+            label: `Loan for ${pick.name}`,
+            principal: pick.cost,
+            tenureMonths: 36,
+          });
+          return `Personal loan taken — EMI ₹${emi.toLocaleString('en-IN')}/mo`;
+        },
+      },
     ],
+    temptation: 5,
+    temptationReason: 'Not optional. Life doesn\'t ask permission.',
   };
 }
 
@@ -543,6 +597,8 @@ function borrowOfferCard(state: GameState, rng: PRNG): Card {
       },
       { id: 'skip', label: 'Decline', apply: () => 'Declined offer' },
     ],
+    temptation: 4,
+    temptationReason: 'Pre-approved. One tap. Cash in your account by tomorrow.',
   };
 }
 
@@ -567,6 +623,8 @@ function paydayBonusCard(state: GameState, _rng: PRNG): Card {
         },
       },
     ],
+    temptation: 1,
+    temptationReason: 'Free money. Nothing to resist.',
   };
 }
 
@@ -588,6 +646,8 @@ function marketEventCard(state: GameState, _rng: PRNG): Card {
       { label: 'Inflation', value: `${(state.market.inflationAnnual * 100).toFixed(2)}%` },
     ],
     options: [{ id: 'ack', label: 'Noted', apply: () => 'Read the news' }],
+    temptation: 1,
+    temptationReason: 'A news headline. The action is what you do next month.',
   };
 }
 

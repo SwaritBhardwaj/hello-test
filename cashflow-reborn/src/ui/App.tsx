@@ -1,11 +1,47 @@
 import { useMemo, useState } from 'react';
 import { useGameStore, DAYS_IN_MONTH } from './store';
-import { formatINR, formatPct } from '@/utils/money';
+import { formatINR } from '@/utils/money';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { LOAN_RATES } from '@/data/constants';
 import { buildLoan } from '@/modules/loans/loans';
+import { PROFESSIONS, startingSalary } from '@/modules/player/career';
 import type { Card } from '@/modules/cards/cards';
 import type { ProfessionId, Loan, Asset, LoanKind } from '@/types';
+
+const RANDOM_NAMES = [
+  'Aarav', 'Aditi', 'Arjun', 'Ananya', 'Dhruv', 'Diya', 'Ishaan', 'Isha',
+  'Kabir', 'Kavya', 'Krishna', 'Maya', 'Neil', 'Nisha', 'Rohan', 'Riya',
+  'Vihaan', 'Vanya', 'Yash', 'Zara', 'Aryan', 'Meera', 'Aditya', 'Sara',
+];
+
+function rollRandomCharacter(): {
+  name: string;
+  age: number;
+  profession: ProfessionId;
+  city: 'T1' | 'T2' | 'T3';
+  family: 'single' | 'married' | 'married_with_kids';
+} {
+  const r = Math.random;
+  const name = RANDOM_NAMES[Math.floor(r() * RANDOM_NAMES.length)];
+  const professionIds = Object.keys(PROFESSIONS) as ProfessionId[];
+  const profession = professionIds[Math.floor(r() * professionIds.length)];
+  // Age band by profession — doctors/founders skew older, govt/teacher span wider
+  const ageBands: Record<ProfessionId, [number, number]> = {
+    sde: [23, 38], product_manager: [26, 42], doctor: [28, 50], teacher: [24, 50],
+    ca: [25, 45], designer: [23, 40], sales: [24, 48], govt_clerk: [23, 55], founder: [27, 45],
+  };
+  const [aMin, aMax] = ageBands[profession];
+  const age = aMin + Math.floor(r() * (aMax - aMin + 1));
+  // City weighted T1 > T2 > T3
+  const cityRoll = r();
+  const city: 'T1' | 'T2' | 'T3' = cityRoll < 0.5 ? 'T1' : cityRoll < 0.8 ? 'T2' : 'T3';
+  // Family by age
+  let family: 'single' | 'married' | 'married_with_kids';
+  if (age < 27) family = r() < 0.85 ? 'single' : 'married';
+  else if (age < 32) family = r() < 0.45 ? 'single' : r() < 0.7 ? 'married' : 'married_with_kids';
+  else family = r() < 0.2 ? 'single' : r() < 0.5 ? 'married' : 'married_with_kids';
+  return { name, age, profession, city, family };
+}
 
 export default function App() {
   const state = useGameStore((s) => s.state);
@@ -18,61 +54,144 @@ export default function App() {
 // ============================================================
 function SetupScreen() {
   const initGame = useGameStore((s) => s.initGame);
+  const [mode, setMode] = useState<'menu' | 'custom' | 'random'>('menu');
   const [name, setName] = useState('Swarit');
   const [age, setAge] = useState(28);
   const [profession, setProfession] = useState<ProfessionId>('product_manager');
   const [city, setCity] = useState<'T1' | 'T2' | 'T3'>('T1');
   const [family, setFamily] = useState<'single' | 'married' | 'married_with_kids'>('single');
 
+  const yoe = Math.max(0, age - 22);
+  const monthlySalary = startingSalary(profession, city, yoe);
+
+  function rollRandom() {
+    const c = rollRandomCharacter();
+    setName(c.name);
+    setAge(c.age);
+    setProfession(c.profession);
+    setCity(c.city);
+    setFamily(c.family);
+    setMode('random');
+  }
+
+  function start() {
+    initGame({
+      seed: Math.floor(Math.random() * 1e9),
+      playerName: name,
+      age,
+      profession,
+      city,
+      family,
+    });
+  }
+
+  if (mode === 'menu') {
+    return (
+      <div className="min-h-screen flex items-center justify-center felt p-6">
+        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md space-y-5 ring-4 ring-amber-700/40">
+          <div className="flex items-center gap-3">
+            <span className="text-4xl">🎲</span>
+            <div>
+              <h1 className="text-3xl font-bold">Cashflow Reborn</h1>
+              <p className="text-sm text-slate-500 -mt-0.5">A boardgame about life and money</p>
+            </div>
+          </div>
+          <div className="space-y-3 pt-2">
+            <button
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-4 rounded-xl w-full font-semibold tracking-wide shadow-lg ring-2 ring-emerald-300/40 transition active:scale-[0.98]"
+              onClick={rollRandom}
+            >
+              🎲 Roll a random character
+              <div className="text-xs font-normal opacity-80 mt-0.5">Realistic age, job, city — like real life dealt you a hand</div>
+            </button>
+            <button
+              className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-3 rounded-xl w-full font-semibold transition active:scale-[0.98]"
+              onClick={() => setMode('custom')}
+            >
+              ✏️ Customise my character
+              <div className="text-xs font-normal opacity-70 mt-0.5">Pick every detail yourself</div>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center felt p-6">
       <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md space-y-4 ring-4 ring-amber-700/40">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">🎲</span>
-          <div>
-            <h1 className="text-2xl font-bold">Cashflow Reborn</h1>
-            <p className="text-xs text-slate-500 -mt-0.5">A boardgame about life and money</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl">🎲</span>
+            <div>
+              <h1 className="text-xl font-bold">{mode === 'random' ? 'Your character' : 'Customise'}</h1>
+              <p className="text-xs text-slate-500 -mt-0.5">Cashflow Reborn</p>
+            </div>
           </div>
+          <button
+            className="text-xs text-slate-500 hover:text-slate-700"
+            onClick={() => setMode('menu')}
+          >
+            ← back
+          </button>
         </div>
-        <p className="text-sm text-slate-600">Set up your run.</p>
-        <Field label="Name">
-          <input className="border rounded p-2 w-full" value={name} onChange={(e) => setName(e.target.value)} />
-        </Field>
-        <Field label="Age">
-          <input type="number" className="border rounded p-2 w-full" value={age} onChange={(e) => setAge(+e.target.value)} />
-        </Field>
-        <Field label="Profession">
-          <select className="border rounded p-2 w-full" value={profession} onChange={(e) => setProfession(e.target.value as ProfessionId)}>
-            <option value="sde">Software Engineer</option>
-            <option value="product_manager">Product Manager</option>
-            <option value="doctor">Doctor</option>
-            <option value="ca">Chartered Accountant</option>
-            <option value="teacher">Teacher</option>
-            <option value="designer">Designer</option>
-            <option value="sales">Sales</option>
-            <option value="govt_clerk">Govt Employee</option>
-            <option value="founder">Founder</option>
-          </select>
-        </Field>
-        <Field label="City Tier">
-          <select className="border rounded p-2 w-full" value={city} onChange={(e) => setCity(e.target.value as 'T1' | 'T2' | 'T3')}>
-            <option value="T1">T1 (Mumbai/Delhi/BLR)</option>
-            <option value="T2">T2 (Pune/Jaipur/Indore)</option>
-            <option value="T3">T3 (smaller cities)</option>
-          </select>
-        </Field>
-        <Field label="Family">
-          <select className="border rounded p-2 w-full" value={family} onChange={(e) => setFamily(e.target.value as typeof family)}>
-            <option value="single">Single</option>
-            <option value="married">Married</option>
-            <option value="married_with_kids">Married + kids</option>
-          </select>
-        </Field>
+
+        {mode === 'random' && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm space-y-1">
+            <div className="font-semibold text-emerald-900">Random hand:</div>
+            <div className="text-emerald-800">
+              <b>{name}</b>, {age} years old, working as a <b>{PROFESSIONS[profession].label}</b> in <b>{city}</b>
+              {family === 'single' ? ', single' : family === 'married' ? ', married' : ', married with kids'}.
+            </div>
+            <div className="text-emerald-700 text-xs">
+              Monthly salary: <b>{formatINR(monthlySalary)}</b> ({yoe} yrs experience)
+            </div>
+            <button className="text-xs text-emerald-700 hover:text-emerald-900 underline mt-1" onClick={rollRandom}>
+              🎲 Reroll
+            </button>
+          </div>
+        )}
+
+        {mode === 'custom' && (
+          <>
+            <Field label="Name">
+              <input className="border rounded p-2 w-full" value={name} onChange={(e) => setName(e.target.value)} />
+            </Field>
+            <Field label="Age">
+              <input type="number" className="border rounded p-2 w-full" value={age} onChange={(e) => setAge(+e.target.value)} />
+            </Field>
+            <Field label="Profession">
+              <select className="border rounded p-2 w-full" value={profession} onChange={(e) => setProfession(e.target.value as ProfessionId)}>
+                {(Object.keys(PROFESSIONS) as ProfessionId[]).map((p) => (
+                  <option key={p} value={p}>{PROFESSIONS[p].label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="City Tier">
+              <select className="border rounded p-2 w-full" value={city} onChange={(e) => setCity(e.target.value as 'T1' | 'T2' | 'T3')}>
+                <option value="T1">T1 (Mumbai/Delhi/BLR)</option>
+                <option value="T2">T2 (Pune/Jaipur/Indore)</option>
+                <option value="T3">T3 (smaller cities)</option>
+              </select>
+            </Field>
+            <Field label="Family">
+              <select className="border rounded p-2 w-full" value={family} onChange={(e) => setFamily(e.target.value as typeof family)}>
+                <option value="single">Single</option>
+                <option value="married">Married</option>
+                <option value="married_with_kids">Married + kids</option>
+              </select>
+            </Field>
+            <div className="text-xs text-slate-500 -mt-1">
+              Starting salary: <b>{formatINR(monthlySalary)}/mo</b>
+            </div>
+          </>
+        )}
+
         <button
           className="bg-amber-600 text-white px-4 py-3 rounded-xl w-full hover:bg-amber-700 font-semibold tracking-wide shadow"
-          onClick={() => initGame({ seed: Math.floor(Math.random() * 1e9), playerName: name, age, profession, city, family })}
+          onClick={start}
         >
-          Start Game
+          ▶ Start Game
         </button>
       </div>
     </div>
@@ -278,17 +397,40 @@ function DieFace({ value }: { value: number | null }) {
 // ============================================================
 function CardModal({ card }: { card: Card }) {
   const resolve = useGameStore((s) => s.resolveCardOption);
+  const resolveWithLoan = useGameStore((s) => s.resolveCardOptionWithLoan);
   const state = useGameStore((s) => s.state)!;
+  const t = Math.min(5, Math.max(1, card.temptation));
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
       <div className="bg-gradient-to-br from-amber-50 to-white rounded-2xl shadow-2xl max-w-md w-full ring-4 ring-amber-600/60 animate-card-in">
         <div className="bg-amber-700 text-white rounded-t-xl px-5 py-3 flex items-center gap-3">
           <span className="text-3xl">{card.emoji}</span>
-          <div>
+          <div className="flex-1">
             <div className="font-bold text-lg leading-tight">{card.title}</div>
             {card.subtitle && <div className="text-xs opacity-90">{card.subtitle}</div>}
           </div>
         </div>
+
+        {/* Temptation meter */}
+        <div className={`px-5 py-2 border-b border-amber-200 ${t >= 4 ? 'bg-rose-50' : t >= 3 ? 'bg-amber-50' : 'bg-slate-50'}`}>
+          <div className="flex items-center justify-between">
+            <div className="text-[10px] uppercase tracking-wider text-slate-600 font-semibold">
+              {t >= 5 ? 'YOU NEED THIS' : t >= 4 ? 'Very tempting' : t >= 3 ? 'Tempting' : t >= 2 ? 'Mildly interesting' : 'Take it or leave it'}
+            </div>
+            <div className="flex gap-0.5">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <span key={i} className={`text-base ${i <= t ? (t >= 4 ? 'text-rose-500' : 'text-amber-500') : 'text-slate-300'}`}>
+                  {i <= t ? '♥' : '♡'}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="text-xs italic text-slate-600 mt-0.5 leading-snug">
+            "{card.temptationReason}"
+          </div>
+        </div>
+
         <div className="p-5 space-y-3">
           <p className="text-sm text-slate-700">{card.description}</p>
           {card.rows && (
@@ -307,21 +449,45 @@ function CardModal({ card }: { card: Card }) {
           <div className="space-y-2 pt-2">
             {card.options.map((o) => {
               const cantAfford = o.affordCheck?.(state);
-              const disabled = !!cantAfford;
+              const isResist = o.id === 'skip';
+              const isBuy = !isResist;
+              // Show borrow button when this option needs cash and player is short
+              const showBorrow = !!cantAfford && o.cashCost && state.cashOnHand < o.cashCost;
+              const shortfall = o.cashCost ? Math.max(0, o.cashCost - state.cashOnHand) : 0;
+              const borrowAmount = Math.ceil(shortfall / 10_000) * 10_000;
+
+              const baseBtn = isResist
+                ? `bg-slate-50 border-slate-300 hover:bg-slate-100 text-slate-700 ${t >= 4 ? 'opacity-70 text-xs py-2' : ''}`
+                : isBuy && t >= 4
+                  ? 'bg-gradient-to-r from-amber-100 to-rose-100 border-rose-400 hover:from-amber-200 hover:to-rose-200 text-slate-900 shadow-md'
+                  : 'bg-white border-amber-300 hover:bg-amber-50 hover:border-amber-500 text-slate-800';
+              const disabledClass = cantAfford ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : '';
+
               return (
-                <button
-                  key={o.id}
-                  className={`w-full text-left px-4 py-3 rounded-lg border-2 transition
-                    ${disabled
-                      ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
-                      : 'bg-white border-amber-300 hover:bg-amber-50 hover:border-amber-500 text-slate-800'}`}
-                  onClick={() => !disabled && resolve(o.id)}
-                  disabled={disabled}
-                >
-                  <div className="font-semibold">{o.label}</div>
-                  {o.detail && <div className="text-xs text-slate-500 mt-0.5">{o.detail}</div>}
-                  {cantAfford && <div className="text-xs text-red-500 mt-0.5">{cantAfford}</div>}
-                </button>
+                <div key={o.id} className="space-y-1.5">
+                  <button
+                    className={`w-full text-left px-4 py-3 rounded-lg border-2 transition ${cantAfford ? disabledClass : baseBtn}`}
+                    onClick={() => !cantAfford && resolve(o.id)}
+                    disabled={!!cantAfford}
+                  >
+                    <div className="font-semibold">{o.label}</div>
+                    {o.detail && <div className="text-xs text-slate-500 mt-0.5">{o.detail}</div>}
+                    {cantAfford && <div className="text-xs text-red-500 mt-0.5">{cantAfford}</div>}
+                  </button>
+                  {showBorrow && (
+                    <button
+                      className="w-full text-left px-4 py-2 rounded-lg border-2 border-dashed border-rose-300 bg-rose-50/50 hover:bg-rose-100 transition"
+                      onClick={() => resolveWithLoan(o.id, 'personal')}
+                    >
+                      <div className="text-sm font-semibold text-rose-700">
+                        🏦 Borrow ₹{borrowAmount.toLocaleString('en-IN')} & buy
+                      </div>
+                      <div className="text-xs text-rose-600 mt-0.5">
+                        Personal loan @ 13.5% p.a., 3yr · The card never sleeps
+                      </div>
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -383,43 +549,207 @@ function BalanceSheetDrawer({ onClose }: { onClose: () => void }) {
 function StatementTab() {
   const state = useGameStore((s) => s.state)!;
   const monthlySalary = state.incomeStreams.filter((i) => i.kind === 'salary').reduce((s, i) => s + i.monthlyGross, 0);
-  const monthlyOtherIncome = state.incomeStreams.filter((i) => i.kind !== 'salary').reduce((s, i) => s + i.monthlyGross, 0);
-  const yieldMonthly = state.assets.reduce((s, a) => s + (a.currentPrice * a.units * a.yieldRateAnnual) / 12, 0);
+  const monthlyFreelance = state.incomeStreams.filter((i) => i.kind === 'freelance').reduce((s, i) => s + i.monthlyGross, 0);
+
+  // Asset yield bucketed by source
+  const yieldByKind = { rent: 0, dividend: 0, interest: 0 };
+  for (const a of state.assets) {
+    const monthly = (a.currentPrice * a.units * a.yieldRateAnnual) / 12;
+    if (a.kind === 'real_estate_residential' || a.kind === 'real_estate_commercial' || a.kind === 'reit') yieldByKind.rent += monthly;
+    else if (a.kind === 'savings' || a.kind === 'fd' || a.kind === 'ppf' || a.kind === 'nps' || a.kind === 'gold') yieldByKind.interest += monthly;
+    else yieldByKind.dividend += monthly;
+  }
+  yieldByKind.rent = Math.round(yieldByKind.rent);
+  yieldByKind.dividend = Math.round(yieldByKind.dividend);
+  yieldByKind.interest = Math.round(yieldByKind.interest);
+  const totalPassive = yieldByKind.rent + yieldByKind.dividend + yieldByKind.interest;
+  const totalIncome = monthlySalary + monthlyFreelance + totalPassive;
+
   const totalEMI = state.liabilities.reduce((s, l) => s + l.emi, 0);
   const totalPremium = state.insurance.reduce((s, i) => s + i.monthlyPremium, 0);
   const livingExpenses = state.expenses.reduce((s, e) => s + e.monthlyAmount, 0);
+  const totalExpenses = livingExpenses + totalEMI + totalPremium;
+  const cashflow = totalIncome - totalExpenses;
+
+  // Asset breakdown
+  const assetGroups: Record<string, { label: string; value: number }[]> = {};
+  for (const a of state.assets) {
+    const groupKey = assetGroup(a.kind);
+    if (!assetGroups[groupKey]) assetGroups[groupKey] = [];
+    assetGroups[groupKey].push({ label: a.label, value: a.currentPrice * a.units });
+  }
+  const totalAssets = state.cashOnHand + Object.values(assetGroups).flat().reduce((s, x) => s + x.value, 0);
+
+  const totalLiab = state.liabilities.reduce((s, l) => s + l.principalOutstanding, 0);
+  const netWorth = totalAssets - totalLiab;
+  const passiveCoverage = totalExpenses > 0 ? totalPassive / totalExpenses : 0;
 
   return (
-    <div className="space-y-6">
-      <Section title="INCOME (monthly)" color="emerald">
-        <Row label="Salary" value={formatINR(monthlySalary)} />
-        {monthlyOtherIncome > 0 && <Row label="Other / freelance" value={formatINR(monthlyOtherIncome)} />}
-        <Row label="Asset yield (dividends/rent/interest)" value={formatINR(Math.round(yieldMonthly))} />
-        <Row label="TOTAL INCOME" value={formatINR(monthlySalary + monthlyOtherIncome + Math.round(yieldMonthly))} bold />
-      </Section>
+    <div className="space-y-4">
+      {/* Header strip */}
+      <div className="bg-slate-900 text-white rounded-lg p-3 grid grid-cols-3 gap-2 text-center">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider opacity-60">Net worth</div>
+          <div className="text-lg font-bold">{formatINR(netWorth, { compact: true })}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider opacity-60">Cashflow / mo</div>
+          <div className={`text-lg font-bold ${cashflow >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
+            {cashflow >= 0 ? '+' : ''}{formatINR(cashflow, { compact: true })}
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wider opacity-60">Passive / Expenses</div>
+          <div className={`text-lg font-bold ${passiveCoverage >= 1 ? 'text-emerald-300' : 'text-amber-200'}`}>
+            {(passiveCoverage * 100).toFixed(0)}%
+          </div>
+        </div>
+      </div>
 
-      <Section title="EXPENSES (monthly)" color="rose">
-        {state.expenses.map((e, i) => (
-          <Row key={i} label={`${e.category} — ${e.label}`} value={formatINR(e.monthlyAmount)} />
-        ))}
-        {totalEMI > 0 && <Row label="Loan EMIs" value={formatINR(totalEMI)} />}
-        {totalPremium > 0 && <Row label="Insurance premiums" value={formatINR(totalPremium)} />}
-        <Row label="TOTAL EXPENSES" value={formatINR(livingExpenses + totalEMI + totalPremium)} bold />
-      </Section>
+      {/* Income & Expenses (top half) */}
+      <div className="grid md:grid-cols-2 gap-3">
+        <Quadrant title="INCOME" subtitle="Monthly" color="emerald" total={totalIncome}>
+          <LedgerRow label="Salary" value={monthlySalary} />
+          {monthlyFreelance > 0 && <LedgerRow label="Freelance / side hustle" value={monthlyFreelance} />}
+          <LedgerSubhead>Passive</LedgerSubhead>
+          {yieldByKind.rent > 0 && <LedgerRow label="Rental income" value={yieldByKind.rent} indent />}
+          {yieldByKind.dividend > 0 && <LedgerRow label="Dividends" value={yieldByKind.dividend} indent />}
+          {yieldByKind.interest > 0 && <LedgerRow label="Interest / yield" value={yieldByKind.interest} indent />}
+          {totalPassive === 0 && <LedgerRow label="(none yet)" value={0} indent muted />}
+        </Quadrant>
 
-      <Section title="CASH FLOW" color="amber">
-        <Row label="Cash on hand" value={formatINR(state.cashOnHand)} bold />
-        <Row label="Net monthly cashflow" value={formatINR(state.statement.totalIncome - state.statement.totalExpenses)} />
-        <Row label="Savings rate" value={formatPct(state.statement.savingsRate, 1)} />
-      </Section>
+        <Quadrant title="EXPENSES" subtitle="Monthly" color="rose" total={totalExpenses}>
+          {state.expenses
+            .filter((e) => e.monthlyAmount > 0)
+            .map((e, i) => (
+              <LedgerRow key={i} label={prettyExpense(e.category, e.label)} value={e.monthlyAmount} />
+            ))}
+          {totalEMI > 0 && (
+            <>
+              <LedgerSubhead>Loan EMIs</LedgerSubhead>
+              {state.liabilities.map((l) => (
+                <LedgerRow key={l.id} label={l.label} value={l.emi} indent />
+              ))}
+            </>
+          )}
+          {totalPremium > 0 && (
+            <>
+              <LedgerSubhead>Insurance</LedgerSubhead>
+              {state.insurance.map((p) => (
+                <LedgerRow key={p.id} label={p.label} value={p.monthlyPremium} indent />
+              ))}
+            </>
+          )}
+        </Quadrant>
+      </div>
 
-      <Section title="NET WORTH" color="slate">
-        <Row label="Total assets" value={formatINR(state.statement.totalAssets)} />
-        <Row label="Total liabilities" value={formatINR(state.statement.totalLiabilities)} />
-        <Row label="NET WORTH" value={formatINR(state.statement.netWorth)} bold />
-      </Section>
+      {/* Assets & Liabilities (bottom half) */}
+      <div className="grid md:grid-cols-2 gap-3">
+        <Quadrant title="ASSETS" subtitle="Current value" color="sky" total={totalAssets}>
+          <LedgerRow label="Cash on hand" value={state.cashOnHand} />
+          {Object.entries(assetGroups).map(([group, items]) => {
+            const groupTotal = items.reduce((s, x) => s + x.value, 0);
+            return (
+              <div key={group}>
+                <LedgerSubhead>{group} <span className="text-slate-400 font-normal">({formatINR(groupTotal, { compact: true })})</span></LedgerSubhead>
+                {items.map((x, i) => (
+                  <LedgerRow key={i} label={x.label} value={x.value} indent />
+                ))}
+              </div>
+            );
+          })}
+          {Object.keys(assetGroups).length === 0 && (
+            <LedgerRow label="(no investments yet — draw deal cards!)" value={0} muted />
+          )}
+        </Quadrant>
+
+        <Quadrant title="LIABILITIES" subtitle="Outstanding principal" color="orange" total={totalLiab}>
+          {state.liabilities.length === 0 && <LedgerRow label="🎉 Debt-free" value={0} muted />}
+          {state.liabilities.map((l) => (
+            <div key={l.id}>
+              <LedgerRow label={l.label} value={l.principalOutstanding} />
+              <div className="text-[10px] text-slate-500 -mt-0.5 ml-1">
+                {(l.rateAnnual * 100).toFixed(1)}% · {l.remainingMonths}mo · EMI {formatINR(l.emi)}
+              </div>
+            </div>
+          ))}
+        </Quadrant>
+      </div>
+
+      {/* Balance proof */}
+      <div className="bg-slate-50 border border-slate-300 rounded-lg p-3 text-center text-sm font-mono">
+        <div className="text-slate-500 text-xs">Assets &minus; Liabilities = Net Worth</div>
+        <div className="font-bold text-slate-900 mt-1">
+          {formatINR(totalAssets, { compact: true })} &minus; {formatINR(totalLiab, { compact: true })} ={' '}
+          <span className={netWorth >= 0 ? 'text-emerald-700' : 'text-rose-700'}>
+            {formatINR(netWorth, { compact: true })}
+          </span>
+        </div>
+      </div>
     </div>
   );
+}
+
+function assetGroup(kind: string): string {
+  if (kind.startsWith('real_estate') || kind === 'reit') return 'Real Estate';
+  if (kind === 'stocks' || kind === 'index_fund' || kind === 'active_mf' || kind === 'business_equity') return 'Equity';
+  if (kind === 'gold') return 'Gold';
+  if (kind === 'fd' || kind === 'savings' || kind === 'ppf' || kind === 'nps') return 'Fixed Income';
+  if (kind === 'crypto') return 'Crypto';
+  return 'Other';
+}
+
+function prettyExpense(category: string, label: string): string {
+  const cat = category.replace(/_/g, ' ');
+  if (label.toLowerCase() === cat.toLowerCase()) return cat;
+  return `${cat} — ${label}`;
+}
+
+function Quadrant({
+  title,
+  subtitle,
+  color,
+  total,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  color: 'emerald' | 'rose' | 'sky' | 'orange';
+  total: number;
+  children: React.ReactNode;
+}) {
+  const colorMap = {
+    emerald: { head: 'bg-emerald-700 text-white', total: 'text-emerald-700 border-emerald-300' },
+    rose: { head: 'bg-rose-700 text-white', total: 'text-rose-700 border-rose-300' },
+    sky: { head: 'bg-sky-700 text-white', total: 'text-sky-700 border-sky-300' },
+    orange: { head: 'bg-orange-700 text-white', total: 'text-orange-700 border-orange-300' },
+  };
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+      <div className={`${colorMap[color].head} px-3 py-1.5 flex items-baseline justify-between`}>
+        <span className="font-bold text-sm tracking-wider">{title}</span>
+        <span className="text-[10px] uppercase tracking-wider opacity-80">{subtitle}</span>
+      </div>
+      <div className="p-3 space-y-0.5 text-sm">{children}</div>
+      <div className={`px-3 py-2 border-t-2 ${colorMap[color].total} flex justify-between font-bold text-sm bg-slate-50`}>
+        <span>TOTAL</span>
+        <span className="font-mono">{formatINR(total)}</span>
+      </div>
+    </div>
+  );
+}
+
+function LedgerRow({ label, value, indent, muted }: { label: string; value: number; indent?: boolean; muted?: boolean }) {
+  return (
+    <div className={`flex justify-between text-sm ${indent ? 'ml-3' : ''} ${muted ? 'text-slate-400 italic' : 'text-slate-700'}`}>
+      <span className="truncate pr-2">{label}</span>
+      <span className="font-mono whitespace-nowrap">{value === 0 ? '—' : formatINR(value)}</span>
+    </div>
+  );
+}
+
+function LedgerSubhead({ children }: { children: React.ReactNode }) {
+  return <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mt-1.5 mb-0.5">{children}</div>;
 }
 
 function AssetsTab({ onSell }: { onSell: (a: Asset, units: number) => void }) {
@@ -613,21 +943,6 @@ function Stat({ label, value, hint, accent }: { label: string; value: string; hi
       <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
       <div className="text-lg md:text-xl font-bold mt-0.5">{value}</div>
       {hint && <div className="text-[10px] text-slate-500 mt-0.5">{hint}</div>}
-    </div>
-  );
-}
-
-function Section({ title, color, children }: { title: string; color: 'emerald' | 'rose' | 'amber' | 'slate'; children: React.ReactNode }) {
-  const colorMap = {
-    emerald: 'border-emerald-300 bg-emerald-50',
-    rose: 'border-rose-300 bg-rose-50',
-    amber: 'border-amber-300 bg-amber-50',
-    slate: 'border-slate-300 bg-slate-50',
-  };
-  return (
-    <div className={`border-l-4 ${colorMap[color]} rounded-r-lg p-3`}>
-      <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600 mb-2">{title}</h3>
-      <div className="space-y-1">{children}</div>
     </div>
   );
 }
