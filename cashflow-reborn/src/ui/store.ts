@@ -22,6 +22,16 @@ export type GameStatus = 'playing' | 'won' | 'lost';
 /** Months of running cash < 0 before bankruptcy triggers. */
 export const BANKRUPTCY_GRACE_MONTHS = 6;
 
+const COACH_KEY = 'cashflow-reborn:coach';
+function loadCoachPref(): boolean {
+  if (typeof localStorage === 'undefined') return true;
+  const stored = localStorage.getItem(COACH_KEY);
+  return stored === null ? true : stored === '1'; // default ON for new players
+}
+function saveCoachPref(on: boolean): void {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(COACH_KEY, on ? '1' : '0');
+}
+
 interface GameStore {
   state: GameState | null;
   notifications: string[];
@@ -35,8 +45,14 @@ interface GameStore {
   // Outcome
   gameStatus: GameStatus;
   outcomeDismissed: boolean;    // user clicked "Keep playing" on a status modal
+  // Learning aids
+  coachMode: boolean;
+  /** IDs of recently surfaced wisdom lessons (newest first), capped to ~6. */
+  recentLessonIds: string[];
   // Actions
   initGame: (opts: SetupOptions) => void;
+  toggleCoachMode: () => void;
+  noteLessonShown: (id: string) => void;
   rollDice: () => void;
   resolveCardOption: (optionId: string) => void;
   resolveCardOptionWithLoan: (optionId: string, loanKind?: 'personal' | 'credit_card') => void;
@@ -61,6 +77,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
   pendingCardCells: [],
   gameStatus: 'playing',
   outcomeDismissed: false,
+  coachMode: loadCoachPref(),
+  recentLessonIds: [],
+
+  toggleCoachMode: () => {
+    const next = !get().coachMode;
+    saveCoachPref(next);
+    set({ coachMode: next });
+  },
+
+  noteLessonShown: (id) => {
+    const recent = get().recentLessonIds;
+    if (recent[0] === id) return; // already at top
+    set({ recentLessonIds: [id, ...recent.filter((x) => x !== id)].slice(0, 6) });
+  },
 
   initGame: (opts) => {
     const state = buildInitialState(opts);
@@ -74,6 +104,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       pendingCardCells: [],
       gameStatus: 'playing',
       outcomeDismissed: false,
+      recentLessonIds: [],
     });
   },
 
@@ -252,6 +283,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       pendingCardCells: [],
       gameStatus: 'playing',
       outcomeDismissed: false,
+      recentLessonIds: [],
     }),
 }));
 

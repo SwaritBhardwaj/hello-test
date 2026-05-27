@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGameStore, DAYS_IN_MONTH, BANKRUPTCY_GRACE_MONTHS, trailingNegativeCashMonths } from './store';
 import { formatINR } from '@/utils/money';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { LOAN_RATES } from '@/data/constants';
 import { buildLoan } from '@/modules/loans/loans';
 import { PROFESSIONS, startingSalary } from '@/modules/player/career';
+import { pickLesson } from '@/modules/coach/wisdom';
 import type { Card } from '@/modules/cards/cards';
 import type { ProfessionId, Loan, Asset, LoanKind } from '@/types';
 
@@ -243,6 +244,7 @@ function BoardScreen() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <CoachToggle />
           <button
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl shadow font-semibold"
             onClick={() => setSheetOpen(true)}
@@ -286,6 +288,9 @@ function BoardScreen() {
           cashOnHand={state.cashOnHand}
         />
       )}
+
+      {/* Dynamic coach insight (when coach mode is on) */}
+      <CoachInsight />
 
       {/* The board (day track) */}
       <section className="bg-emerald-900/30 rounded-2xl p-4 ring-4 ring-amber-700/40 shadow-inner">
@@ -586,6 +591,91 @@ function OutcomeModal({ status }: { status: 'won' | 'lost' }) {
 }
 
 // ============================================================
+// Dynamic coach insight — picks a lesson based on player journey
+// ============================================================
+function CoachInsight() {
+  const coachMode = useGameStore((s) => s.coachMode);
+  const state = useGameStore((s) => s.state);
+  const recent = useGameStore((s) => s.recentLessonIds);
+  const note = useGameStore((s) => s.noteLessonShown);
+  // Stash the seen IDs so noteLessonShown doesn't re-trigger render on every state change
+  const seenRef = useRef<string | null>(null);
+
+  const picked = useMemo(() => {
+    if (!coachMode || !state) return null;
+    return pickLesson(state, recent);
+  }, [coachMode, state, recent]);
+
+  // Tell the store we've shown this one (so the next pick deprioritizes it).
+  useEffect(() => {
+    if (picked && picked.lesson.id !== seenRef.current) {
+      seenRef.current = picked.lesson.id;
+      note(picked.lesson.id);
+    }
+  }, [picked, note]);
+
+  if (!coachMode || !picked) return null;
+
+  const { lesson, context } = picked;
+  const toneByTag = {
+    debt: 'from-rose-700 to-rose-900 text-white',
+    saving: 'from-amber-600 to-amber-800 text-white',
+    spending: 'from-orange-600 to-orange-800 text-white',
+    investing: 'from-sky-700 to-indigo-700 text-white',
+    behavioral: 'from-purple-700 to-violet-800 text-white',
+    risk: 'from-rose-600 to-pink-700 text-white',
+    general: 'from-slate-700 to-slate-900 text-white',
+  } as const;
+
+  return (
+    <section className={`rounded-2xl shadow-lg ring-1 ring-amber-700/30 overflow-hidden`}>
+      <div className={`bg-gradient-to-r ${toneByTag[lesson.tag]} px-4 py-2 flex items-center justify-between`}>
+        <div className="flex items-center gap-2">
+          <span className="text-lg">💡</span>
+          <span className="text-[10px] uppercase tracking-widest font-bold opacity-90">
+            Coach insight · {lesson.tag}
+          </span>
+        </div>
+        <span className="text-[10px] opacity-80 font-semibold">— {lesson.attribution}</span>
+      </div>
+      <div className="bg-white px-4 py-3">
+        <div className="text-sm italic text-slate-600 leading-snug border-l-2 border-slate-300 pl-3">
+          {lesson.quote}
+        </div>
+        <div className="text-sm text-slate-800 mt-2 leading-snug">{lesson.lesson}</div>
+        <div className="mt-2 text-[10px] text-slate-400 uppercase tracking-wider flex flex-wrap gap-x-3">
+          <span>passive {Math.round(context.passiveCoverage * 100)}% of expenses</span>
+          <span>cash {context.cashMonths.toFixed(1)}mo</span>
+          <span>EMI/income {Math.round(context.emiToIncome * 100)}%</span>
+          {context.equityShare > 0 && <span>equity {Math.round(context.equityShare * 100)}%</span>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================================
+// Coach mode toggle (header pill)
+// ============================================================
+function CoachToggle() {
+  const coachMode = useGameStore((s) => s.coachMode);
+  const toggle = useGameStore((s) => s.toggleCoachMode);
+  return (
+    <button
+      onClick={toggle}
+      title="Toggle teaching mode — explanations on every card"
+      className={`px-3 py-2 rounded-lg shadow-sm text-sm font-semibold transition flex items-center gap-1.5
+        ${coachMode
+          ? 'bg-indigo-600 hover:bg-indigo-700 text-white ring-2 ring-indigo-300'
+          : 'bg-white hover:bg-slate-50 text-slate-600 ring-1 ring-slate-300'}`}
+    >
+      <span>💡</span>
+      <span>Coach {coachMode ? 'ON' : 'OFF'}</span>
+    </button>
+  );
+}
+
+// ============================================================
 // Day Track (the visible "board")
 // ============================================================
 function DayTrack({
@@ -648,6 +738,7 @@ function DieFace({ value }: { value: number | null }) {
 function CardModal({ card }: { card: Card }) {
   const resolve = useGameStore((s) => s.resolveCardOption);
   const resolveWithLoan = useGameStore((s) => s.resolveCardOptionWithLoan);
+  const coachMode = useGameStore((s) => s.coachMode);
   const state = useGameStore((s) => s.state)!;
   const t = Math.min(5, Math.max(1, card.temptation));
   // Max temptation = no resist option. Player must buy (with cash or borrowed).
@@ -695,6 +786,15 @@ function CardModal({ card }: { card: Card }) {
               ))}
             </div>
           )}
+          {coachMode && card.coachNote && (
+            <div className="bg-indigo-50 border-l-4 border-indigo-400 rounded-r-lg p-3 text-xs leading-relaxed">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-base">💡</span>
+                <span className="font-bold uppercase tracking-wider text-indigo-700 text-[10px]">Coach</span>
+              </div>
+              <p className="text-indigo-900">{card.coachNote}</p>
+            </div>
+          )}
           <div className="text-xs text-slate-400">
             You have <span className="font-semibold text-slate-700">{formatINR(state.cashOnHand)}</span> in cash.
           </div>
@@ -721,6 +821,11 @@ function CardModal({ card }: { card: Card }) {
                   : 'bg-white border-amber-300 hover:bg-amber-50 hover:border-amber-500 text-slate-800';
               const disabledClass = cantAfford ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed' : '';
 
+              const warningTone = o.coachWarning?.startsWith('WORST')
+                ? 'text-rose-700 bg-rose-50 border-rose-200'
+                : o.coachWarning?.startsWith('Best')
+                  ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                  : 'text-indigo-700 bg-indigo-50 border-indigo-200';
               return (
                 <div key={o.id} className="space-y-1.5">
                   <button
@@ -732,6 +837,11 @@ function CardModal({ card }: { card: Card }) {
                     {o.detail && <div className="text-xs text-slate-500 mt-0.5">{o.detail}</div>}
                     {cantAfford && <div className="text-xs text-red-500 mt-0.5">{cantAfford}</div>}
                   </button>
+                  {coachMode && o.coachWarning && (
+                    <div className={`text-[11px] leading-snug px-3 py-1.5 rounded border-l-2 ${warningTone}`}>
+                      💡 {o.coachWarning}
+                    </div>
+                  )}
                   {showBorrow && (
                     <button
                       className="w-full text-left px-4 py-2 rounded-lg border-2 border-dashed border-rose-300 bg-rose-50/50 hover:bg-rose-100 transition"

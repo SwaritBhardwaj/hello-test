@@ -25,6 +25,8 @@ export interface CardOption {
   /** Cash needed for this option. If set and cash < cashCost, the UI offers a
    *  "Borrow & buy" alternative that takes a personal loan to cover the gap. */
   cashCost?: number;
+  /** Coach-mode warning: shown under the button to teach what choosing this means. */
+  coachWarning?: string;
 }
 
 export interface Card {
@@ -40,6 +42,19 @@ export interface Card {
   temptation: number;
   /** One-line flavor explaining the temptation. */
   temptationReason: string;
+  /** Coach-mode lesson: the financial concept behind this card. */
+  coachNote?: string;
+}
+
+/** Compound a one-time cost over N years to show "the real cost". */
+function compounded30y(amount: number): number {
+  return Math.round(amount * Math.pow(1.12, 30));
+}
+function compounded30yMonthly(monthly: number): number {
+  // SIP-style: FV of monthly contribution over 30y at 12% annual
+  const r = Math.pow(1.12, 1 / 12) - 1;
+  const n = 30 * 12;
+  return Math.round(monthly * ((Math.pow(1 + r, n) - 1) / r));
 }
 
 const lakh = 100_000;
@@ -199,6 +214,10 @@ function realEstateCard(state: GameState, rng: PRNG): Card {
     ],
     temptation: isCommercial ? 3 : 4,
     temptationReason: 'Property! Your uncle says it always doubles. Your spouse already mentally lives there.',
+    coachNote:
+      `Cap rate = annual rent ÷ price = ${(pick.rentPctAnnual * 100).toFixed(1)}%. ` +
+      `Below ~4% = priced for appreciation, not cashflow. With 25% down and a loan, you're 4x leveraged: ` +
+      `a 10% price drop wipes out your equity. Inflation here ≈ 5.5% p.a. — that's the floor you're beating.`,
   };
 }
 
@@ -252,6 +271,10 @@ function stockCard(state: GameState, rng: PRNG): Card {
     ],
     temptation: 3,
     temptationReason: 'A friend on WhatsApp says this is going to 5x by year-end. The chart looks bullish.',
+    coachNote:
+      `Single stocks: ~70% of them trail the index over 20+ years. ` +
+      `Even good picks have 30-50% drawdowns regularly. Position-size accordingly: ` +
+      `no single stock should be >5-10% of your portfolio. STCG tax = 15% if held <1yr, LTCG = 10% above ₹1L gains/yr.`,
   };
 }
 
@@ -301,6 +324,13 @@ function indexFundCard(state: GameState, rng: PRNG): Card {
     ],
     temptation: 2,
     temptationReason: 'The boring sensible choice. No dopamine, just compounding.',
+    coachNote:
+      pick.kind === 'reit'
+        ? `REIT = Real Estate Investment Trust. Fund that owns rental properties; trades on the exchange like a stock. ` +
+          `~90% of rental income gets paid out as dividends. Lower minimum than buying property; instantly liquid.`
+        : `Index funds track a basket (NIFTY 50, etc.) at low expense ratios (<0.5%). ` +
+          `Over 20+ years they outperform 80%+ of active funds after fees. SIP = monthly auto-buy, smooths price entry. ` +
+          `LTCG (held >1yr) = 10% on gains above ₹1L per FY.`,
   };
 }
 
@@ -342,6 +372,10 @@ function goldCard(state: GameState, rng: PRNG): Card {
     ],
     temptation: 2,
     temptationReason: 'Your mom keeps reminding you that gold has never let her down.',
+    coachNote:
+      `Gold: long-term ~8% returns, mostly inflation hedge. Negative correlation with equity in crashes. ` +
+      `Sovereign Gold Bonds (SGB) > physical gold: 2.5% extra interest, no storage, no making charges, ` +
+      `capital gains tax-free if held to maturity. Keep gold under 10% of portfolio.`,
   };
 }
 
@@ -389,6 +423,10 @@ function businessCard(state: GameState, rng: PRNG): Card {
     ],
     temptation: 3,
     temptationReason: 'Imagine the LinkedIn announcement. Imagine quitting your job.',
+    coachNote:
+      `Private business equity: high return potential (15-25%) but ~70% of small businesses fail in 5 years. ` +
+      `Illiquid — you can't sell quickly if you need cash. Position max 10-15% of net worth. ` +
+      `Angel/startup tickets: assume 0 unless you can wait 7-10 years and lose it all.`,
   };
 }
 
@@ -447,7 +485,24 @@ function doodadCard(state: GameState, rng: PRNG): Card {
     ],
     temptation: pick.temptation,
     temptationReason: pick.reason,
+    coachNote: doodadCoachNote(pick.cash, pick.monthly, pick.name),
   };
+}
+
+function doodadCoachNote(oneTime: number, monthly: number, name: string): string {
+  if (monthly > 0) {
+    const futureValue = compounded30yMonthly(monthly);
+    return (
+      `Monthly subscription of ₹${monthly.toLocaleString('en-IN')} = ₹${(futureValue / 1e7).toFixed(1)} Cr ` +
+      `if invested instead at 12% over 30 years. Lifestyle creep is the silent killer of wealth: ` +
+      `small recurring expenses compound against you, just like investments compound for you.`
+    );
+  }
+  const futureValue = compounded30y(oneTime);
+  return (
+    `₹${oneTime.toLocaleString('en-IN')} today = ₹${(futureValue / 1e5).toFixed(1)} L if invested at 12% over 30 years. ` +
+    `That's the "${name}" tax on Future-You. Doesn't mean don't buy it — just buy it knowing the trade.`
+  );
 }
 
 function resistLabel(temptation: number): string {
@@ -495,6 +550,10 @@ function sideHustleCard(state: GameState, rng: PRNG): Card {
     ],
     temptation: 3,
     temptationReason: 'Easy extra income… but evenings and weekends are not free.',
+    coachNote:
+      `Side hustles are leverage on your time. The math: ₹${pick.monthly.toLocaleString('en-IN')}/mo for ${pick.months} months ` +
+      `= ₹${(pick.monthly * pick.months).toLocaleString('en-IN')} gross. After 30% tax + opportunity cost of evenings, ` +
+      `the net is real but smaller. Most useful for plugging a savings gap or funding a specific goal.`,
   };
 }
 
@@ -527,6 +586,7 @@ function unseenExpenseCard(state: GameState, rng: PRNG): Card {
           s.cashOnHand -= pick.cost;
           return `Paid ₹${pick.cost.toLocaleString('en-IN')} for ${pick.name}`;
         },
+        coachWarning: `Best option. Zero interest. This is why you keep an emergency fund.`,
       },
       {
         id: 'cc',
@@ -540,6 +600,9 @@ function unseenExpenseCard(state: GameState, rng: PRNG): Card {
           });
           return `On credit card @ 36% — EMI ₹${emi.toLocaleString('en-IN')}/mo`;
         },
+        coachWarning:
+          `WORST option. 36% p.a. is loanshark territory. ` +
+          `₹${pick.cost.toLocaleString('en-IN')} over 6 months ≈ ₹${Math.round(pick.cost * 0.11).toLocaleString('en-IN')} interest paid.`,
       },
       {
         id: 'personal',
@@ -553,10 +616,16 @@ function unseenExpenseCard(state: GameState, rng: PRNG): Card {
           });
           return `Personal loan taken — EMI ₹${emi.toLocaleString('en-IN')}/mo`;
         },
+        coachWarning:
+          `OK if you must borrow. Rate ~3x cheaper than CC. ` +
+          `Total interest over 3yr ≈ ₹${Math.round(pick.cost * 0.22).toLocaleString('en-IN')}.`,
       },
     ],
     temptation: 5,
     temptationReason: 'Not optional. Life doesn\'t ask permission.',
+    coachNote:
+      `Why emergency funds exist. Rule of thumb: 6 months of expenses parked in a liquid fund / savings (3-7% yield). ` +
+      `Without one, you pay 36% on credit cards instead of earning 12% on equity — a 48-point swing on every rupee.`,
   };
 }
 
@@ -594,11 +663,18 @@ function borrowOfferCard(state: GameState, rng: PRNG): Card {
           pushLoan(s, { kind: pick.kind, label: pick.label, principal: pick.principal, tenureMonths: pick.tenureMonths });
           return `Took ${pick.label}`;
         },
+        coachWarning:
+          `Total interest over ${pick.tenureMonths} months ≈ ₹${(emi * pick.tenureMonths - pick.principal).toLocaleString('en-IN')}. ` +
+          `If you can't articulate WHY you need this loan right now, decline.`,
       },
       { id: 'skip', label: 'Decline', apply: () => 'Declined offer' },
     ],
     temptation: 4,
     temptationReason: 'Pre-approved. One tap. Cash in your account by tomorrow.',
+    coachNote:
+      `DTI rule: total EMIs ÷ gross monthly income should stay under 40% (some say 30%). ` +
+      `Pre-approved means the bank thinks you can pay, not that you should. Personal loans @ 13.5%+ ` +
+      `only make sense for high-return investments — and there are very few of those.`,
   };
 }
 
@@ -625,6 +701,9 @@ function paydayBonusCard(state: GameState, _rng: PRNG): Card {
     ],
     temptation: 1,
     temptationReason: 'Free money. Nothing to resist.',
+    coachNote:
+      `Windfall psychology: bonuses, tax refunds, gifts feel "free" so we spend them harder than salary. ` +
+      `Pre-decide where windfalls go (50% invest, 30% goal, 20% guilt-free spend) before they arrive.`,
   };
 }
 
@@ -648,6 +727,11 @@ function marketEventCard(state: GameState, _rng: PRNG): Card {
     options: [{ id: 'ack', label: 'Noted', apply: () => 'Read the news' }],
     temptation: 1,
     temptationReason: 'A news headline. The action is what you do next month.',
+    coachNote: isUp
+      ? `Markets at peaks: this is when FOMO peaks too. Lump-sum entries into peaks underperform SIPs. ` +
+        `Resist the urge to chase. Boring discipline beats hot tips.`
+      : `Crashes are when fortunes get made — but only for those who already had cash. ` +
+        `If you're forced-selling during a crash you've already lost. Emergency fund + SIPs through fear = the strategy.`,
   };
 }
 
