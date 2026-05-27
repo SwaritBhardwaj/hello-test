@@ -8,21 +8,13 @@ import { PROFESSIONS, startingSalary } from '@/modules/player/career';
 import type { Card } from '@/modules/cards/cards';
 import type { ProfessionId, Loan, Asset, LoanKind } from '@/types';
 
-const RANDOM_NAMES = [
-  'Aarav', 'Aditi', 'Arjun', 'Ananya', 'Dhruv', 'Diya', 'Ishaan', 'Isha',
-  'Kabir', 'Kavya', 'Krishna', 'Maya', 'Neil', 'Nisha', 'Rohan', 'Riya',
-  'Vihaan', 'Vanya', 'Yash', 'Zara', 'Aryan', 'Meera', 'Aditya', 'Sara',
-];
-
 function rollRandomCharacter(): {
-  name: string;
   age: number;
   profession: ProfessionId;
   city: 'T1' | 'T2' | 'T3';
   family: 'single' | 'married' | 'married_with_kids';
 } {
   const r = Math.random;
-  const name = RANDOM_NAMES[Math.floor(r() * RANDOM_NAMES.length)];
   const professionIds = Object.keys(PROFESSIONS) as ProfessionId[];
   const profession = professionIds[Math.floor(r() * professionIds.length)];
   // Age band by profession — doctors/founders skew older, govt/teacher span wider
@@ -40,7 +32,7 @@ function rollRandomCharacter(): {
   if (age < 27) family = r() < 0.85 ? 'single' : 'married';
   else if (age < 32) family = r() < 0.45 ? 'single' : r() < 0.7 ? 'married' : 'married_with_kids';
   else family = r() < 0.2 ? 'single' : r() < 0.5 ? 'married' : 'married_with_kids';
-  return { name, age, profession, city, family };
+  return { age, profession, city, family };
 }
 
 export default function App() {
@@ -66,7 +58,7 @@ function SetupScreen() {
 
   function rollRandom() {
     const c = rollRandomCharacter();
-    setName(c.name);
+    // Name is always entered by the player — only randomize the life circumstances
     setAge(c.age);
     setProfession(c.profession);
     setCity(c.city);
@@ -101,8 +93,8 @@ function SetupScreen() {
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-4 rounded-xl w-full font-semibold tracking-wide shadow-lg ring-2 ring-emerald-300/40 transition active:scale-[0.98]"
               onClick={rollRandom}
             >
-              🎲 Roll a random character
-              <div className="text-xs font-normal opacity-80 mt-0.5">Realistic age, job, city — like real life dealt you a hand</div>
+              🎲 Roll random circumstances
+              <div className="text-xs font-normal opacity-80 mt-0.5">You pick the name; the dice pick age, job, city, family</div>
             </button>
             <button
               className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-3 rounded-xl w-full font-semibold transition active:scale-[0.98]"
@@ -137,19 +129,30 @@ function SetupScreen() {
         </div>
 
         {mode === 'random' && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm space-y-1">
-            <div className="font-semibold text-emerald-900">Random hand:</div>
-            <div className="text-emerald-800">
-              <b>{name}</b>, {age} years old, working as a <b>{PROFESSIONS[profession].label}</b> in <b>{city}</b>
-              {family === 'single' ? ', single' : family === 'married' ? ', married' : ', married with kids'}.
+          <>
+            <Field label="Your name">
+              <input
+                className="border rounded p-2 w-full"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Swarit"
+                autoFocus
+              />
+            </Field>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm space-y-1">
+              <div className="font-semibold text-emerald-900">The hand life dealt:</div>
+              <div className="text-emerald-800">
+                {age} years old, working as a <b>{PROFESSIONS[profession].label}</b> in <b>{city}</b>
+                {family === 'single' ? ', single' : family === 'married' ? ', married' : ', married with kids'}.
+              </div>
+              <div className="text-emerald-700 text-xs">
+                Monthly salary: <b>{formatINR(monthlySalary)}</b> ({yoe} yrs experience)
+              </div>
+              <button className="text-xs text-emerald-700 hover:text-emerald-900 underline mt-1" onClick={rollRandom}>
+                🎲 Reroll circumstances
+              </button>
             </div>
-            <div className="text-emerald-700 text-xs">
-              Monthly salary: <b>{formatINR(monthlySalary)}</b> ({yoe} yrs experience)
-            </div>
-            <button className="text-xs text-emerald-700 hover:text-emerald-900 underline mt-1" onClick={rollRandom}>
-              🎲 Reroll
-            </button>
-          </div>
+          </>
         )}
 
         {mode === 'custom' && (
@@ -188,8 +191,9 @@ function SetupScreen() {
         )}
 
         <button
-          className="bg-amber-600 text-white px-4 py-3 rounded-xl w-full hover:bg-amber-700 font-semibold tracking-wide shadow"
+          className="bg-amber-600 text-white px-4 py-3 rounded-xl w-full hover:bg-amber-700 font-semibold tracking-wide shadow disabled:bg-slate-300 disabled:cursor-not-allowed"
           onClick={start}
+          disabled={!name.trim()}
         >
           ▶ Start Game
         </button>
