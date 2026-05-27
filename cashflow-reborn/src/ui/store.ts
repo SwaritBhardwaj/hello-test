@@ -4,9 +4,36 @@ import { tick, buildInitialState, type SetupOptions, PRNG } from '@/engine';
 import { drawRandomCard, type Card, type CardOption } from '@/modules/cards/cards';
 import { buildLoan } from '@/modules/loans/loans';
 import { computeStatement } from '@/modules/dashboard/statement';
+import type { CoachDecisionEntry, DecisionCategory } from '@/modules/coach/actionLog';
 
 const DAYS_PER_MONTH = 30;
 const CARD_CELLS_PER_MONTH = 7;
+
+/** Classify a card option resolution into a coarse behavioral category. */
+function categorize(card: Card, optionId: string): DecisionCategory {
+  if (optionId === 'skip') return 'resist';
+  switch (card.kind) {
+    case 'doodad': {
+      // Subscription = adds to monthly lifestyle expense (id still 'buy' but apply pushes monthly)
+      // We can't introspect apply(); but the card row label says "Monthly cost" for subs.
+      const isSub = card.rows?.some((r) => r.label === 'Monthly cost') ?? false;
+      return isSub ? 'doodad_subscription' : 'doodad_oneshot';
+    }
+    case 'deal_real_estate': return 'invest_real_estate';
+    case 'deal_stock':       return 'invest_stock';
+    case 'deal_index_fund':  return 'invest_index';
+    case 'deal_gold':        return 'invest_gold';
+    case 'deal_business':    return 'invest_business';
+    case 'side_hustle':      return optionId === 'accept' ? 'side_hustle_accept' : 'resist';
+    case 'unseen_expense':
+      if (optionId === 'cc') return 'unseen_expense_cc';
+      if (optionId === 'personal') return 'unseen_expense_loan';
+      return 'unseen_expense_cash';
+    case 'borrow_offer':     return optionId === 'accept' ? 'borrow_personal' : 'resist';
+    case 'market_event':
+    case 'payday_bonus':     return 'noop';
+  }
+}
 
 function rollCardCells(seed: number): number[] {
   const rng = new PRNG(seed >>> 0);
@@ -49,6 +76,8 @@ interface GameStore {
   coachMode: boolean;
   /** IDs of recently surfaced wisdom lessons (newest first), capped to ~6. */
   recentLessonIds: string[];
+  /** Player's actual card decisions over time — drives behavioral-pattern lessons. */
+  decisionLog: CoachDecisionEntry[];
   // Actions
   initGame: (opts: SetupOptions) => void;
   toggleCoachMode: () => void;
@@ -79,6 +108,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   outcomeDismissed: false,
   coachMode: loadCoachPref(),
   recentLessonIds: [],
+  decisionLog: [],
 
   toggleCoachMode: () => {
     const next = !get().coachMode;
@@ -105,6 +135,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameStatus: 'playing',
       outcomeDismissed: false,
       recentLessonIds: [],
+      decisionLog: [],
     });
   },
 
@@ -166,11 +197,20 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const cloned: GameState = JSON.parse(JSON.stringify(s.state));
     const note = applyOption(cloned, opt);
     cloned.statement = computeStatement(cloned);
+    const entry: CoachDecisionEntry = {
+      tick: cloned.meta.tick,
+      cardKind: s.currentCard.kind,
+      optionId,
+      borrowed: false,
+      marketPhase: cloned.market.phase,
+      category: categorize(s.currentCard, optionId),
+    };
     set({
       state: cloned,
       notifications: [...s.notifications, `🃏 ${note}`].slice(-25),
       currentCard: null,
       gameStatus: evaluateGameStatus(cloned, s.gameStatus),
+      decisionLog: [...s.decisionLog, entry],
     });
     // Draw next pending if any
     setTimeout(() => drawNextCard(), 200);
@@ -200,6 +240,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
     cloned.cashOnHand += principal;
     const note = applyOption(cloned, opt);
     cloned.statement = computeStatement(cloned);
+    const entry: CoachDecisionEntry = {
+      tick: cloned.meta.tick,
+      cardKind: s.currentCard.kind,
+      optionId,
+      borrowed: true,
+      marketPhase: cloned.market.phase,
+      category: categorize(s.currentCard, optionId),
+    };
     set({
       state: cloned,
       notifications: [
@@ -209,6 +257,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       ].slice(-25),
       currentCard: null,
       gameStatus: evaluateGameStatus(cloned, s.gameStatus),
+      decisionLog: [...s.decisionLog, entry],
     });
     setTimeout(() => drawNextCard(), 200);
   },
@@ -263,10 +312,23 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const cloned: GameState = JSON.parse(JSON.stringify(s.state));
     const note = applyDecisionDirect(cloned, action);
     cloned.statement = computeStatement(cloned);
+    // Log balance-sheet actions so behavioral lessons can see them
+    const log = [...s.decisionLog];
+    if (action.kind === 'sell_asset') {
+      log.push({
+        tick: cloned.meta.tick,
+        cardKind: 'deal_stock', // synthetic — we only need category for pattern detection
+        optionId: 'sell',
+        borrowed: false,
+        marketPhase: cloned.market.phase,
+        category: 'sell_asset',
+      });
+    }
     set({
       state: cloned,
       notifications: [...s.notifications, note ?? '...'].slice(-25),
       gameStatus: evaluateGameStatus(cloned, s.gameStatus),
+      decisionLog: log,
     });
   },
 
@@ -284,6 +346,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameStatus: 'playing',
       outcomeDismissed: false,
       recentLessonIds: [],
+      decisionLog: [],
     }),
 }));
 

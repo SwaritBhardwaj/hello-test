@@ -597,14 +597,15 @@ function CoachInsight() {
   const coachMode = useGameStore((s) => s.coachMode);
   const state = useGameStore((s) => s.state);
   const recent = useGameStore((s) => s.recentLessonIds);
+  const log = useGameStore((s) => s.decisionLog);
   const note = useGameStore((s) => s.noteLessonShown);
   // Stash the seen IDs so noteLessonShown doesn't re-trigger render on every state change
   const seenRef = useRef<string | null>(null);
 
   const picked = useMemo(() => {
     if (!coachMode || !state) return null;
-    return pickLesson(state, recent);
-  }, [coachMode, state, recent]);
+    return pickLesson(state, log, recent);
+  }, [coachMode, state, log, recent]);
 
   // Tell the store we've shown this one (so the next pick deprioritizes it).
   useEffect(() => {
@@ -625,7 +626,15 @@ function CoachInsight() {
     behavioral: 'from-purple-700 to-violet-800 text-white',
     risk: 'from-rose-600 to-pink-700 text-white',
     general: 'from-slate-700 to-slate-900 text-white',
+    tax: 'from-teal-700 to-cyan-800 text-white',
+    insurance: 'from-blue-700 to-indigo-800 text-white',
+    career: 'from-fuchsia-700 to-pink-800 text-white',
   } as const;
+
+  const verifiedTone =
+    lesson.verified === 'verbatim' ? 'bg-emerald-100 text-emerald-800' :
+    lesson.verified === 'paraphrased' ? 'bg-amber-100 text-amber-800' :
+    'bg-slate-100 text-slate-600';
 
   return (
     <section className={`rounded-2xl shadow-lg ring-1 ring-amber-700/30 overflow-hidden`}>
@@ -643,11 +652,25 @@ function CoachInsight() {
           {lesson.quote}
         </div>
         <div className="text-sm text-slate-800 mt-2 leading-snug">{lesson.lesson}</div>
-        <div className="mt-2 text-[10px] text-slate-400 uppercase tracking-wider flex flex-wrap gap-x-3">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px]">
+          <span className={`px-1.5 py-0.5 rounded font-semibold uppercase tracking-wider ${verifiedTone}`}>
+            {lesson.verified}
+          </span>
+          <span className="text-slate-500">Source: {lesson.source}</span>
+          {lesson.book && (
+            <span className="text-indigo-700 font-semibold ml-auto">📖 {lesson.book}</span>
+          )}
+        </div>
+        <div className="mt-1.5 text-[10px] text-slate-400 uppercase tracking-wider flex flex-wrap gap-x-3 gap-y-0.5 border-t border-slate-100 pt-1.5">
           <span>passive {Math.round(context.passiveCoverage * 100)}% of expenses</span>
           <span>cash {context.cashMonths.toFixed(1)}mo</span>
           <span>EMI/income {Math.round(context.emiToIncome * 100)}%</span>
           {context.equityShare > 0 && <span>equity {Math.round(context.equityShare * 100)}%</span>}
+          {context.cryptoShare > 0 && <span>crypto {Math.round(context.cryptoShare * 100)}%</span>}
+          {context.doodadOneshotLast12mo > 0 && <span>doodads/12mo: {context.doodadOneshotLast12mo}</span>}
+          {context.panicSellsLast24mo > 0 && <span className="text-rose-500 font-semibold">panic-sells: {context.panicSellsLast24mo}</span>}
+          {context.fomoBuysAtPeakLast24mo > 0 && <span className="text-rose-500 font-semibold">peak-buys: {context.fomoBuysAtPeakLast24mo}</span>}
+          {context.resistsLast12mo > 0 && <span className="text-emerald-600">resisted: {context.resistsLast12mo}</span>}
         </div>
       </div>
     </section>
