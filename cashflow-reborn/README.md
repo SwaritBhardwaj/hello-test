@@ -1,6 +1,8 @@
 # Cashflow Reborn
 
-A realistic financial literacy simulation game. v0.1 scaffold.
+A realistic financial literacy simulation game.
+
+**Play it live:** [swaritbhardwaj.github.io/cashflow-reborn](https://swaritbhardwaj.github.io/cashflow-reborn/)
 
 See `docs/PRD.md` (or the parent folder's PRD) for product context.
 
