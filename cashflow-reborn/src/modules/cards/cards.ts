@@ -763,3 +763,65 @@ export function drawRandomCard(state: GameState, rng: PRNG): Card {
   }
   return GENERATORS[0].gen(state, rng);
 }
+
+// ============================================================
+// Tile types — the board square you land on biases the card
+// ============================================================
+
+export type TileType = 'deal' | 'temptation' | 'market' | 'chance' | 'payday';
+
+/** Display metadata per tile type (board rendering). */
+export const TILE_META: Record<TileType, { label: string; short: string }> = {
+  deal: { label: 'Deal', short: 'Deal' },
+  temptation: { label: 'Temptation', short: 'Want' },
+  market: { label: 'Market', short: 'News' },
+  chance: { label: 'Chance', short: 'Luck' },
+  payday: { label: 'Payday', short: 'Pay' },
+};
+
+const TILE_POOLS: Record<TileType, Array<{ weight: number; gen: (s: GameState, r: PRNG) => Card }>> = {
+  deal: [
+    { weight: 3, gen: indexFundCard },
+    { weight: 2, gen: stockCard },
+    { weight: 2, gen: realEstateCard },
+    { weight: 1, gen: goldCard },
+    { weight: 1, gen: businessCard },
+  ],
+  temptation: [{ weight: 1, gen: doodadCard }],
+  market: [{ weight: 1, gen: marketEventCard }],
+  chance: [
+    { weight: 2, gen: unseenExpenseCard },
+    { weight: 2, gen: sideHustleCard },
+    { weight: 1, gen: borrowOfferCard },
+    { weight: 1, gen: paydayBonusCard },
+  ],
+  payday: [{ weight: 1, gen: paydayBonusCard }],
+};
+
+/** Draw a card appropriate to the tile the player landed on. */
+export function drawCardForTile(state: GameState, rng: PRNG, tile: TileType): Card {
+  const pool = TILE_POOLS[tile];
+  const total = pool.reduce((s, g) => s + g.weight, 0);
+  const pick = rng.next() * total;
+  let acc = 0;
+  for (const g of pool) {
+    acc += g.weight;
+    if (pick < acc) return g.gen(state, rng);
+  }
+  return pool[0].gen(state, rng);
+}
+
+/** Weighted assignment of a tile type for a freshly placed card square. */
+export function rollTileType(rng: PRNG): TileType {
+  const weights: Array<[TileType, number]> = [
+    ['deal', 3], ['temptation', 3], ['market', 2], ['chance', 2], ['payday', 1],
+  ];
+  const total = weights.reduce((s, [, w]) => s + w, 0);
+  const pick = rng.next() * total;
+  let acc = 0;
+  for (const [t, w] of weights) {
+    acc += w;
+    if (pick < acc) return t;
+  }
+  return 'deal';
+}

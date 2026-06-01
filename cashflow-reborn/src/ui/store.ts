@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { GameState, TickInput, DecisionAction } from '@/types';
 import { tick, buildInitialState, type SetupOptions, PRNG } from '@/engine';
-import { drawRandomCard, type Card, type CardOption } from '@/modules/cards/cards';
+import { drawRandomCard, drawCardForTile, rollTileType, type TileType, type Card, type CardOption } from '@/modules/cards/cards';
 import { buildLoan } from '@/modules/loans/loans';
 import { computeStatement } from '@/modules/dashboard/statement';
 import type { CoachDecisionEntry, DecisionCategory } from '@/modules/coach/actionLog';
@@ -44,6 +44,14 @@ function rollCardCells(seed: number): number[] {
   return [...cells].sort((a, b) => a - b);
 }
 
+/** Assign a tile type to each card cell (deterministic from the same seed). */
+function assignCellTypes(cells: number[], seed: number): Record<number, TileType> {
+  const rng = new PRNG((seed ^ 0x9e3779b9) >>> 0);
+  const out: Record<number, TileType> = {};
+  for (const day of cells) out[day] = rollTileType(rng);
+  return out;
+}
+
 export type GameStatus = 'playing' | 'won' | 'lost';
 
 /** Months of running cash < 0 before bankruptcy triggers. */
@@ -67,6 +75,7 @@ interface GameStore {
   lastRoll: number | null;
   isRolling: boolean;
   cardCells: number[];          // day indices that draw a card
+  cellTypes: Record<number, TileType>; // tile type per card cell
   currentCard: Card | null;
   pendingCardCells: number[];   // queue of card cells crossed but not yet drawn
   // Outcome
@@ -102,6 +111,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   lastRoll: null,
   isRolling: false,
   cardCells: [],
+  cellTypes: {},
   currentCard: null,
   pendingCardCells: [],
   gameStatus: 'playing',
@@ -130,6 +140,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       dayPosition: 0,
       lastRoll: null,
       cardCells: rollCardCells(opts.seed),
+      cellTypes: assignCellTypes(rollCardCells(opts.seed), opts.seed),
       currentCard: null,
       pendingCardCells: [],
       gameStatus: 'playing',
@@ -166,6 +177,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         dayPosition: finalDay,
         lastRoll: roll,
         cardCells: rollCardCells(nextSeed),
+        cellTypes: assignCellTypes(rollCardCells(nextSeed), nextSeed),
         pendingCardCells: crossed,
         isRolling: false,
         gameStatus: evaluateGameStatus(result.state, s.gameStatus),
@@ -277,6 +289,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       state: result.state,
       notifications: [...get().notifications, ...result.notifications].slice(-25),
       cardCells: rollCardCells(nextSeed),
+      cellTypes: assignCellTypes(rollCardCells(nextSeed), nextSeed),
       dayPosition: 0,
       gameStatus: evaluateGameStatus(result.state, get().gameStatus),
     });
@@ -301,6 +314,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       state: s,
       notifications: [...get().notifications, `⏩ Fast-forwarded ${months} months`, ...allNotes].slice(-25),
       cardCells: rollCardCells(nextSeed),
+      cellTypes: assignCellTypes(rollCardCells(nextSeed), nextSeed),
       dayPosition: 0,
       gameStatus: status,
     });
@@ -341,6 +355,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       dayPosition: 0,
       lastRoll: null,
       cardCells: [],
+      cellTypes: {},
       currentCard: null,
       pendingCardCells: [],
       gameStatus: 'playing',
@@ -385,9 +400,10 @@ function drawNextCard() {
   const s = useGameStore.getState();
   if (s.currentCard || !s.state) return;
   if (s.pendingCardCells.length === 0) return;
-  const [, ...rest] = s.pendingCardCells;
+  const [day, ...rest] = s.pendingCardCells;
   const rng = new PRNG((s.state.meta.seed + s.state.meta.tick * 13 + s.dayPosition + Math.floor(Math.random() * 1000)) >>> 0);
-  const card = drawRandomCard(s.state, rng);
+  const tile = s.cellTypes[day];
+  const card = tile ? drawCardForTile(s.state, rng, tile) : drawRandomCard(s.state, rng);
   useGameStore.setState({ currentCard: card, pendingCardCells: rest });
 }
 
