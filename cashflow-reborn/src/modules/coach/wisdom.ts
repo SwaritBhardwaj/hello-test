@@ -912,13 +912,20 @@ export const WISDOM: CoachLesson[] = [
 
 /**
  * Pick the most relevant lesson for the player's current state + history.
- * Higher priority wins; recently-shown lessons get deprioritized so the
- * panel cycles as the player's journey evolves.
+ *
+ * Selection is a PURE function of (state, log): highest priority wins, and
+ * among the top-priority tier we rotate deterministically by the in-game month
+ * so the panel still varies as the player's journey evolves.
+ *
+ * IMPORTANT: this intentionally does NOT depend on a "recently shown" list.
+ * An earlier version deprioritized recently-shown lessons, but the UI fed its
+ * own output back in as input — once more than 6 lessons applied at once, the
+ * pick never stabilized and <CoachInsight> looped setState every render,
+ * crashing the whole app to a white screen. See tests/whitescreen-repro.test.ts.
  */
 export function pickLesson(
   state: GameState,
   log: CoachDecisionEntry[],
-  recentlyShown: string[] = [],
 ): { lesson: CoachLesson; context: CoachContext } | null {
   const ctx = buildCoachContext(state, log);
   const applicable = WISDOM.filter((l) => {
@@ -929,12 +936,11 @@ export function pickLesson(
     }
   });
   if (applicable.length === 0) return null;
-  const recent = new Set(recentlyShown);
-  applicable.sort((a, b) => {
-    const ra = recent.has(a.id) ? 1 : 0;
-    const rb = recent.has(b.id) ? 1 : 0;
-    if (ra !== rb) return ra - rb;
-    return b.priority - a.priority;
-  });
-  return { lesson: applicable[0], context: ctx };
+  // Highest-priority tier, in stable WISDOM order.
+  const maxPriority = Math.max(...applicable.map((l) => l.priority));
+  const topTier = applicable.filter((l) => l.priority === maxPriority);
+  // Rotate within the tier by month — a stable input, so the result can never
+  // oscillate within a single render.
+  const idx = ((state.meta.tick % topTier.length) + topTier.length) % topTier.length;
+  return { lesson: topTier[idx], context: ctx };
 }

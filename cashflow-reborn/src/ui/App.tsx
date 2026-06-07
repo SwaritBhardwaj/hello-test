@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore, DAYS_IN_MONTH, BANKRUPTCY_GRACE_MONTHS, trailingNegativeCashMonths } from './store';
 import { formatINR } from '@/utils/money';
@@ -564,24 +564,16 @@ function BankruptcyWarning({ monthsNegative, monthsToBankruptcy, cashOnHand }: {
 function CoachInsight() {
   const coachMode = useGameStore((s) => s.coachMode);
   const state = useGameStore((s) => s.state);
-  const recent = useGameStore((s) => s.recentLessonIds);
   const log = useGameStore((s) => s.decisionLog);
-  const note = useGameStore((s) => s.noteLessonShown);
-  const seenRef = useRef<string | null>(null);
   const [open, setOpen] = useState(false);
 
+  // Pure function of (state, log): the pick is stable within a render, so this
+  // can never loop. (It used to feed a "recently shown" list back into itself,
+  // which white-screened the app once >6 lessons applied. See wisdom.ts.)
   const picked = useMemo(() => {
     if (!coachMode || !state) return null;
-    return pickLesson(state, log, recent);
-  }, [coachMode, state, log, recent]);
-
-  useEffect(() => {
-    if (picked && picked.lesson.id !== seenRef.current) {
-      seenRef.current = picked.lesson.id;
-      note(picked.lesson.id);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [picked]);
+    return pickLesson(state, log);
+  }, [coachMode, state, log]);
 
   if (!coachMode || !picked) return null;
   const { lesson } = picked;

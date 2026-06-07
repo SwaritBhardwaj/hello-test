@@ -83,14 +83,11 @@ interface GameStore {
   outcomeDismissed: boolean;    // user clicked "Keep playing" on a status modal
   // Learning aids
   coachMode: boolean;
-  /** IDs of recently surfaced wisdom lessons (newest first), capped to ~6. */
-  recentLessonIds: string[];
   /** Player's actual card decisions over time — drives behavioral-pattern lessons. */
   decisionLog: CoachDecisionEntry[];
   // Actions
   initGame: (opts: SetupOptions) => void;
   toggleCoachMode: () => void;
-  noteLessonShown: (id: string) => void;
   rollDice: () => void;
   resolveCardOption: (optionId: string) => void;
   resolveCardOptionWithLoan: (optionId: string, loanKind?: 'personal' | 'credit_card') => void;
@@ -117,19 +114,12 @@ export const useGameStore = create<GameStore>((set, get) => ({
   gameStatus: 'playing',
   outcomeDismissed: false,
   coachMode: loadCoachPref(),
-  recentLessonIds: [],
   decisionLog: [],
 
   toggleCoachMode: () => {
     const next = !get().coachMode;
     saveCoachPref(next);
     set({ coachMode: next });
-  },
-
-  noteLessonShown: (id) => {
-    const recent = get().recentLessonIds;
-    if (recent[0] === id) return; // already at top
-    set({ recentLessonIds: [id, ...recent.filter((x) => x !== id)].slice(0, 6) });
   },
 
   initGame: (opts) => {
@@ -145,7 +135,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       pendingCardCells: [],
       gameStatus: 'playing',
       outcomeDismissed: false,
-      recentLessonIds: [],
       decisionLog: [],
     });
   },
@@ -360,7 +349,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
       pendingCardCells: [],
       gameStatus: 'playing',
       outcomeDismissed: false,
-      recentLessonIds: [],
       decisionLog: [],
     }),
 }));
