@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore, DAYS_IN_MONTH, BANKRUPTCY_GRACE_MONTHS, trailingNegativeCashMonths } from './store';
+import { useT, useLangStore } from './lang';
+import { LANGS } from '@/i18n/loc';
 import { formatINR } from '@/utils/money';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { LOAN_RATES } from '@/data/constants';
@@ -8,7 +10,6 @@ import { buildLoan } from '@/modules/loans/loans';
 import { PROFESSIONS, startingSalary } from '@/modules/player/career';
 import { pickLesson } from '@/modules/coach/wisdom';
 import type { Card, TileType } from '@/modules/cards/cards';
-import { TILE_META } from '@/modules/cards/cards';
 import type { ProfessionId, Loan, Asset, LoanKind } from '@/types';
 import { Die } from './art/Die';
 import { Coin, Pawn } from './art/Pieces';
@@ -58,6 +59,7 @@ export default function App() {
 // Setup
 // ============================================================
 function SetupScreen() {
+  const { t } = useT();
   const initGame = useGameStore((s) => s.initGame);
   const [mode, setMode] = useState<'menu' | 'custom' | 'random'>('menu');
   const [name, setName] = useState('Swarit');
@@ -94,83 +96,83 @@ function SetupScreen() {
       >
         <div className="bg-wood-700 px-6 py-5 flex items-center gap-3 border-b-4 border-brass/50">
           <Die value={5} size={44} />
-          <div>
+          <div className="flex-1">
             <h1 className="font-display text-2xl text-card leading-none">Cashflow Reborn</h1>
-            <p className="text-xs text-brass-100/80 mt-1">A board game about life &amp; money</p>
+            <p className="text-xs text-brass-100/80 mt-1">{t('app.tagline')}</p>
           </div>
+          <LanguageToggle />
         </div>
 
         <div className="p-6 space-y-4">
           {mode === 'menu' && (
             <div className="space-y-3">
               <PrimaryButton onClick={rollRandom} className="w-full">
-                <span className="flex items-center justify-center gap-2"><Die value={3} size={22} /> Roll random circumstances</span>
-                <span className="block text-2xs font-normal opacity-80 mt-1">You pick the name; the dice pick age, job, city &amp; family</span>
+                <span className="flex items-center justify-center gap-2"><Die value={3} size={22} /> {t('setup.rollRandom')}</span>
+                <span className="block text-2xs font-normal opacity-80 mt-1">{t('setup.rollRandomSub')}</span>
               </PrimaryButton>
               <button
                 onClick={() => { play('click'); setMode('custom'); }}
                 className="btn-3d w-full bg-card text-ink px-4 py-3 text-base"
               >
-                Customise my character
-                <span className="block text-2xs font-normal text-ink-soft mt-0.5">Pick every detail yourself</span>
+                {t('setup.customise')}
+                <span className="block text-2xs font-normal text-ink-soft mt-0.5">{t('setup.customiseSub')}</span>
               </button>
             </div>
           )}
 
           {mode === 'random' && (
             <>
-              <Field label="Your name">
+              <Field label={t('setup.yourName')}>
                 <TextInput value={name} onChange={setName} placeholder="e.g. Swarit" autoFocus />
               </Field>
               <div className="rounded-xl bg-income-soft border border-income/30 p-3 text-sm space-y-1">
-                <div className="font-display text-income-ink">The hand life dealt</div>
+                <div className="font-display text-income-ink">{t('setup.handDealt')}</div>
                 <div className="text-ink-soft">
-                  {age} years old, a <b className="text-ink">{PROFESSIONS[profession].label}</b> in <b className="text-ink">{city}</b>
-                  {family === 'single' ? ', single' : family === 'married' ? ', married' : ', married with kids'}.
+                  {t('setup.lives', { age, profession: PROFESSIONS[profession].label, city })}, {t(`family.${family}.phrase` as 'family.single.phrase')}.
                 </div>
                 <div className="text-ink-soft text-xs flex items-center gap-1">
-                  Monthly salary <Coin size={14} /> <b className="text-ink tnum">{formatINR(monthlySalary)}</b> ({yoe} yrs exp)
+                  {t('setup.monthlySalary')} <Coin size={14} /> <b className="text-ink tnum">{formatINR(monthlySalary)}</b> ({t('setup.yrsExp', { n: yoe })})
                 </div>
-                <button className="text-xs text-income-ink underline mt-1" onClick={rollRandom}>Reroll circumstances</button>
+                <button className="text-xs text-income-ink underline mt-1" onClick={rollRandom}>{t('setup.reroll')}</button>
               </div>
             </>
           )}
 
           {mode === 'custom' && (
             <div className="space-y-3">
-              <Field label="Name"><TextInput value={name} onChange={setName} /></Field>
-              <Field label="Age">
+              <Field label={t('setup.name')}><TextInput value={name} onChange={setName} /></Field>
+              <Field label={t('setup.age')}>
                 <input type="number" className="w-full rounded-lg border border-card-edge p-2 tnum" value={age} onChange={(e) => setAge(+e.target.value)} />
               </Field>
-              <Field label="Profession">
+              <Field label={t('setup.profession')}>
                 <Select value={profession} onChange={(v) => setProfession(v as ProfessionId)}>
                   {(Object.keys(PROFESSIONS) as ProfessionId[]).map((p) => <option key={p} value={p}>{PROFESSIONS[p].label}</option>)}
                 </Select>
               </Field>
-              <Field label="City tier">
+              <Field label={t('setup.cityTier')}>
                 <Select value={city} onChange={(v) => setCity(v as 'T1' | 'T2' | 'T3')}>
                   <option value="T1">T1 (Mumbai / Delhi / BLR)</option>
                   <option value="T2">T2 (Pune / Jaipur / Indore)</option>
                   <option value="T3">T3 (smaller cities)</option>
                 </Select>
               </Field>
-              <Field label="Family">
+              <Field label={t('setup.family')}>
                 <Select value={family} onChange={(v) => setFamily(v as typeof family)}>
-                  <option value="single">Single</option>
-                  <option value="married">Married</option>
-                  <option value="married_with_kids">Married + kids</option>
+                  <option value="single">{t('family.single')}</option>
+                  <option value="married">{t('family.married')}</option>
+                  <option value="married_with_kids">{t('family.married_with_kids')}</option>
                 </Select>
               </Field>
               <div className="text-xs text-ink-soft flex items-center gap-1">
-                Starting salary <Coin size={13} /> <b className="text-ink tnum">{formatINR(monthlySalary)}/mo</b>
+                {t('setup.startingSalary')} <Coin size={13} /> <b className="text-ink tnum">{formatINR(monthlySalary)}/mo</b>
               </div>
             </div>
           )}
 
           {mode !== 'menu' && (
             <div className="flex items-center gap-2 pt-1">
-              <button onClick={() => setMode('menu')} className="text-xs text-ink-faint hover:text-ink px-2 py-2">← back</button>
-              <PrimaryButton onClick={start} disabled={!name.trim()} className="flex-1">▶ Start game</PrimaryButton>
+              <button onClick={() => setMode('menu')} className="text-xs text-ink-faint hover:text-ink px-2 py-2">{t('setup.back')}</button>
+              <PrimaryButton onClick={start} disabled={!name.trim()} className="flex-1">{t('setup.start')}</PrimaryButton>
             </div>
           )}
         </div>
@@ -183,6 +185,7 @@ function SetupScreen() {
 // Main board
 // ============================================================
 function BoardScreen() {
+  const { t } = useT();
   const state = useGameStore((s) => s.state)!;
   const rollDice = useGameStore((s) => s.rollDice);
   const ff = useGameStore((s) => s.fastForward);
@@ -243,25 +246,26 @@ function BoardScreen() {
             </div>
           </div>
           <div className="flex items-center gap-1.5 order-3 sm:order-2 w-full sm:w-auto justify-between sm:justify-end mt-1 sm:mt-0">
-            <MoneyPill label="Net worth" value={state.statement.netWorth} tone={state.statement.netWorth >= 0 ? 'income' : 'expense'} />
-            <MoneyPill label="Cash" value={state.cashOnHand} coin tone={state.cashOnHand < 0 ? 'expense' : 'brass'} />
-            <MoneyPill label="Cashflow" value={state.statement.totalIncome - state.statement.totalExpenses} signed tone={state.statement.totalIncome - state.statement.totalExpenses >= 0 ? 'income' : 'expense'} />
+            <MoneyPill label={t('hud.netWorth')} value={state.statement.netWorth} tone={state.statement.netWorth >= 0 ? 'income' : 'expense'} />
+            <MoneyPill label={t('hud.cash')} value={state.cashOnHand} coin tone={state.cashOnHand < 0 ? 'expense' : 'brass'} />
+            <MoneyPill label={t('hud.cashflow')} value={state.statement.totalIncome - state.statement.totalExpenses} signed tone={state.statement.totalIncome - state.statement.totalExpenses >= 0 ? 'income' : 'expense'} />
           </div>
           <div className="flex items-center gap-1.5 order-2 sm:order-3">
+            <LanguageToggle />
             <CoachStyleToggle />
             <MuteToggle />
             <CoachToggle />
             <button onClick={() => { play('click'); setSheetOpen(true); }} className="btn-3d bg-brass-500 enabled:hover:bg-brass-600 text-wood-900 px-3 py-1.5 text-sm whitespace-nowrap">
-              <span className="hidden sm:inline">Balance sheet</span><span className="sm:hidden">Sheet</span>
+              <span className="hidden sm:inline">{t('hud.balanceSheet')}</span><span className="sm:hidden">{t('hud.sheet')}</span>
             </button>
             <div className="relative">
               <button onClick={() => setMenuOpen((o) => !o)} className="rounded-xl bg-felt-700 hover:bg-felt-600 text-card px-3 py-2 text-sm shadow-piece transition active:scale-95" aria-label="More actions">⋯</button>
               <AnimatePresence>
                 {menuOpen && (
                   <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="absolute right-0 mt-2 w-44 paper rounded-xl shadow-card ring-1 ring-card-edge z-30 overflow-hidden">
-                    <MenuItem onClick={() => { ff(12); setMenuOpen(false); }}>⏩ Skip 1 year</MenuItem>
-                    <MenuItem onClick={() => { ff(60); setMenuOpen(false); }}>⏩ Skip 5 years</MenuItem>
-                    <MenuItem danger onClick={() => { reset(); setMenuOpen(false); }}>⟲ New game</MenuItem>
+                    <MenuItem onClick={() => { ff(12); setMenuOpen(false); }}>{t('menu.skip1y')}</MenuItem>
+                    <MenuItem onClick={() => { ff(60); setMenuOpen(false); }}>{t('menu.skip5y')}</MenuItem>
+                    <MenuItem danger onClick={() => { reset(); setMenuOpen(false); }}>{t('menu.newGame')}</MenuItem>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -293,7 +297,7 @@ function BoardScreen() {
           onClick={handleRoll} disabled={!!currentCard || rolling}
           className="btn-3d w-full bg-brass-500 enabled:hover:bg-brass-600 text-wood-900 text-lg py-3 flex items-center justify-center gap-2"
         >
-          <Die value={lastRoll ?? 6} rolling={rolling} size={30} /> {rolling ? 'Rolling…' : 'ROLL THE DICE'}
+          <Die value={lastRoll ?? 6} rolling={rolling} size={30} /> {rolling ? t('board.rolling') : t('board.rollDice')}
         </button>
       </div>
 
@@ -325,6 +329,7 @@ interface BoardProps {
 }
 
 function BoardPanel(props: BoardProps) {
+  const { t } = useT();
   const { dayPosition, cardCells, cellTypes, year, month, phase } = props;
   const cardSet = useMemo(() => new Set(cardCells), [cardCells]);
   const nextCardDay = useMemo(() => cardCells.filter((c) => c > dayPosition).sort((a, b) => a - b)[0], [cardCells, dayPosition]);
@@ -333,8 +338,8 @@ function BoardPanel(props: BoardProps) {
   return (
     <section className="board-cream rounded-game p-3 sm:p-5 relative">
       <div className="flex items-center justify-between px-1 mb-2">
-        <div className="font-display text-ink text-base sm:text-lg">Month {year * 12 + month}<span className="text-ink-soft text-sm font-sans"> · day {dayPosition}/{DAYS_IN_MONTH}</span></div>
-        <div className="text-xs uppercase tracking-widest text-ink font-display font-semibold capitalize">{phase} market</div>
+        <div className="font-display text-ink text-base sm:text-lg">{t('board.month', { n: year * 12 + month })}<span className="text-ink-soft text-sm font-sans"> · {t('board.day', { d: dayPosition, total: DAYS_IN_MONTH })}</span></div>
+        <div className="text-xs uppercase tracking-widest text-ink font-display font-semibold">{t('board.marketSuffix', { phase: t(`phase.${phase}` as 'phase.expansion') })}</div>
       </div>
 
       {/* Oval racetrack — desktop / tablet */}
@@ -347,6 +352,7 @@ function BoardPanel(props: BoardProps) {
 }
 
 function OvalBoard({ dayPosition, cellTypes, lastRoll, rolling, canRoll, onRoll, coverage, won, passive, expenses, cardSet, nextType }: BoardProps & { cardSet: Set<number>; nextType?: TileType }) {
+  const { t } = useT();
   return (
     <div className="hidden sm:block relative w-full" style={{ aspectRatio: '1.5 / 1' }}>
       {/* printed track ellipse — dark line on cream */}
@@ -371,8 +377,8 @@ function OvalBoard({ dayPosition, cellTypes, lastRoll, rolling, canRoll, onRoll,
                 <div className="animate-token-bob"><Pawn size={30} /></div>
               </motion.div>
             )}
-            {isEnd ? <CornerTile label="FREE" glyph="★" gold />
-              : isStart ? <CornerTile label="START" glyph="▶" />
+            {isEnd ? <CornerTile label={t('tile.free')} glyph="★" gold />
+              : isStart ? <CornerTile label={t('tile.start')} glyph="▶" />
               : isCard && type ? <BoardTile type={type} />
               : <div className="h-2.5 w-2.5 rounded-full bg-[oklch(0.34_0.04_50)]" />}
           </div>
@@ -417,10 +423,11 @@ function PathBoard({ dayPosition, cellTypes, lastRoll, rolling, canRoll, onRoll,
 }
 
 function BoardTile({ type }: { type: TileType }) {
+  const { t } = useT();
   return (
     <div className={`grid place-items-center h-11 w-11 rounded-lg shadow-piece ${TILE_STYLE[type].chip} ${TILE_STYLE[type].text} ${TILE_OUTLINE}`}>
       <TileGlyph type={type} />
-      <span className="font-display font-bold leading-none" style={{ fontSize: 9 }}>{TILE_META[type].short}</span>
+      <span className="font-display font-bold leading-none" style={{ fontSize: 9 }}>{t(`tile.${type}.short` as 'tile.deal.short')}</span>
     </div>
   );
 }
@@ -446,26 +453,27 @@ function Medallion({ coverage, won, passive, expenses, lastRoll, rolling, canRol
   coverage: number; won: boolean; passive: number; expenses: number;
   lastRoll: number | null; rolling: boolean; canRoll: boolean; onRoll: () => void; nextType?: TileType; compact?: boolean;
 }) {
+  const { t } = useT();
   const pct = Math.min(100, coverage * 100);
   return (
     <div className="relative grid place-items-center" style={{ width: compact ? 230 : 260 }}>
       <FreedomRing pct={pct} won={won} size={compact ? 224 : 256}>
         <div className="flex flex-col items-center gap-1">
-          <div className="text-xs uppercase tracking-widest font-display font-bold text-brass-300">{won ? '★ Free!' : 'Freedom'}</div>
+          <div className="text-xs uppercase tracking-widest font-display font-bold text-brass-300">{won ? t('board.free') : t('board.freedom')}</div>
           <div className={`font-display leading-none font-bold ${won ? 'text-brass-300' : 'text-card'}`} style={{ fontSize: 40 }}><PercentCount value={pct} /></div>
           {/* The dice IS the roll button — big, obvious, clickable */}
-          <button onClick={onRoll} disabled={!canRoll} aria-label="Roll the dice"
+          <button onClick={onRoll} disabled={!canRoll} aria-label={t('board.rollDice')}
             className="group mt-0.5 grid place-items-center disabled:opacity-60 enabled:hover:scale-105 enabled:active:scale-95 transition-transform">
             <Die value={lastRoll ?? 1} rolling={rolling} size={compact ? 50 : 58} />
-            <span className="mt-1.5 inline-block btn-3d bg-brass-500 text-wood-900 text-sm px-5 py-1.5 group-enabled:group-hover:bg-brass-600">{rolling ? 'Rolling…' : 'TAP TO ROLL'}</span>
+            <span className="mt-1.5 inline-block btn-3d bg-brass-500 text-wood-900 text-sm px-5 py-1.5 group-enabled:group-hover:bg-brass-600">{rolling ? t('board.rolling') : t('board.tapToRoll')}</span>
           </button>
-          {nextType && <div className="text-xs text-brass-300 font-semibold mt-1">next: <span className="font-display text-card">{TILE_META[nextType].label}</span></div>}
+          {nextType && <div className="text-xs text-brass-300 font-semibold mt-1">{t('board.next')} <span className="font-display text-card">{t(`tile.${nextType}` as 'tile.deal')}</span></div>}
         </div>
       </FreedomRing>
       <div className="mt-1.5 text-xs tnum flex items-center gap-1.5 font-semibold">
-        <span className="text-income-ink">passive {formatINR(passive, { compact: true })}</span>
+        <span className="text-income-ink">{t('board.passive', { x: formatINR(passive, { compact: true }) })}</span>
         <span className="text-ink-soft">/</span>
-        <span className="text-expense-ink">exp {formatINR(expenses, { compact: true })}</span>
+        <span className="text-expense-ink">{t('board.exp', { x: formatINR(expenses, { compact: true }) })}</span>
       </div>
     </div>
   );
@@ -512,13 +520,14 @@ function MoneyPill({ label, value, coin, signed, tone }: { label: string; value:
 }
 
 function HistoryPanel({ data, notes }: { data: { tick: number; netWorth: number; cash: number }[]; notes: string[] }) {
+  const { t: ui } = useT();
   const [tab, setTab] = useState<'chart' | 'log'>('chart');
   return (
     <section className="paper rounded-game shadow-card ring-1 ring-card-edge overflow-hidden">
       <div className="flex border-b border-card-edge">
-        {(['chart', 'log'] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`px-4 py-2 font-display text-sm transition ${tab === t ? 'text-income-ink border-b-2 border-income bg-income-soft/40' : 'text-ink-soft font-semibold hover:bg-card-edge/40'}`}>
-            {t === 'chart' ? 'Net worth' : 'Game log'}
+        {(['chart', 'log'] as const).map((tabKey) => (
+          <button key={tabKey} onClick={() => setTab(tabKey)} className={`px-4 py-2 font-display text-sm transition ${tab === tabKey ? 'text-income-ink border-b-2 border-income bg-income-soft/40' : 'text-ink-soft font-semibold hover:bg-card-edge/40'}`}>
+            {tabKey === 'chart' ? ui('history.netWorth') : ui('history.gameLog')}
           </button>
         ))}
       </div>
@@ -533,6 +542,7 @@ function HistoryPanel({ data, notes }: { data: { tick: number; netWorth: number;
 // Bankruptcy warning
 // ============================================================
 function BankruptcyWarning({ monthsNegative, monthsToBankruptcy, cashOnHand }: { monthsNegative: number; monthsToBankruptcy: number; cashOnHand: number }) {
+  const { t } = useT();
   const dangerPct = (monthsNegative / BANKRUPTCY_GRACE_MONTHS) * 100;
   return (
     <motion.section
@@ -542,18 +552,18 @@ function BankruptcyWarning({ monthsNegative, monthsToBankruptcy, cashOnHand }: {
     >
       <div className="flex items-center justify-between mb-2 gap-2">
         <div className="min-w-0">
-          <div className="font-display text-base">⚠ Cash overdrawn</div>
-          <div className="text-2xs opacity-90 tnum">{formatINR(cashOnHand, { compact: true })} in the red · month {monthsNegative} of {BANKRUPTCY_GRACE_MONTHS}</div>
+          <div className="font-display text-base">{t('bank.overdrawn')}</div>
+          <div className="text-2xs opacity-90 tnum">{t('bank.inRed', { x: formatINR(cashOnHand, { compact: true }), m: monthsNegative, total: BANKRUPTCY_GRACE_MONTHS })}</div>
         </div>
         <div className="text-right shrink-0">
           <div className="font-display text-2xl tnum">{monthsToBankruptcy}</div>
-          <div className="text-2xs uppercase tracking-wider opacity-90">months left</div>
+          <div className="text-2xs uppercase tracking-wider opacity-90">{t('bank.monthsLeft')}</div>
         </div>
       </div>
       <div className="h-1.5 rounded-full bg-card/20 overflow-hidden">
         <div className="h-full bg-card/80" style={{ width: `${dangerPct}%` }} />
       </div>
-      <div className="text-2xs mt-1.5 opacity-90">Sell assets, clear high-rate debt, or cut expenses. Fast.</div>
+      <div className="text-2xs mt-1.5 opacity-90">{t('bank.advice')}</div>
     </motion.section>
   );
 }
@@ -562,6 +572,7 @@ function BankruptcyWarning({ monthsNegative, monthsToBankruptcy, cashOnHand }: {
 // Coach insight
 // ============================================================
 function CoachInsight() {
+  const { t } = useT();
   const coachMode = useGameStore((s) => s.coachMode);
   const state = useGameStore((s) => s.state);
   const log = useGameStore((s) => s.decisionLog);
@@ -584,7 +595,7 @@ function CoachInsight() {
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2.5 px-3 py-2 text-left">
         <div className="shrink-0"><CoachMascot mood={mood} size={30} /></div>
         <div className="min-w-0 flex-1">
-          <div className="text-2xs uppercase tracking-widest font-display text-brass-600">Coach</div>
+          <div className="text-2xs uppercase tracking-widest font-display text-brass-600">{t('coach.label')}</div>
           <div className="text-sm text-ink leading-snug line-clamp-2">{lesson.lesson}</div>
         </div>
         <span className={`shrink-0 text-ink-faint transition-transform ${open ? 'rotate-180' : ''}`}>⌄</span>
@@ -607,6 +618,7 @@ function CoachInsight() {
 // Header toggles
 // ============================================================
 function CoachToggle() {
+  const { t } = useT();
   const coachMode = useGameStore((s) => s.coachMode);
   const toggle = useGameStore((s) => s.toggleCoachMode);
   return (
@@ -615,7 +627,7 @@ function CoachToggle() {
       title="Teaching mode — explanations on every card"
       className={`rounded-xl px-2.5 py-2 text-sm shadow-piece transition active:scale-95 flex items-center gap-1.5 font-display font-semibold ${coachMode ? 'bg-income text-card ring-2 ring-income' : 'bg-felt-700 text-card ring-1 ring-card/20'}`}
     >
-      <CoachMascot mood="happy" size={18} /><span className="hidden sm:inline font-display">{coachMode ? 'Coach on' : 'Coach off'}</span>
+      <CoachMascot mood="happy" size={18} /><span className="hidden sm:inline font-display">{coachMode ? t('coach.on') : t('coach.off')}</span>
     </button>
   );
 }
@@ -641,6 +653,26 @@ function MuteToggle() {
 function MenuItem({ children, onClick, danger }: { children: React.ReactNode; onClick: () => void; danger?: boolean }) {
   return (
     <button onClick={() => { play('click'); onClick(); }} className={`w-full text-left px-4 py-2.5 text-sm hover:bg-card-edge transition ${danger ? 'text-expense-ink' : 'text-ink'}`}>{children}</button>
+  );
+}
+
+/** EN / हिंदी switch — the most prominent way to change language. */
+function LanguageToggle() {
+  const lang = useLangStore((s) => s.lang);
+  const setLang = useLangStore((s) => s.setLang);
+  return (
+    <div className="flex items-center rounded-xl bg-felt-700 shadow-piece overflow-hidden ring-1 ring-card/20" role="group" aria-label="Language">
+      {LANGS.map((l) => (
+        <button
+          key={l.id}
+          onClick={() => { play('click'); setLang(l.id); }}
+          aria-pressed={lang === l.id}
+          className={`px-2.5 py-2 text-sm font-display font-semibold transition active:scale-95 ${lang === l.id ? 'bg-brass-500 text-wood-900' : 'text-card hover:bg-felt-600'}`}
+        >
+          {l.short}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -673,6 +705,7 @@ function AchievementIcon({ icon, size = 22 }: { icon: Achievement['icon']; size?
 }
 
 function AchievementToasts() {
+  const { t: ui } = useT();
   const toasts = useProgression((s) => s.toasts);
   const dismiss = useProgression((s) => s.dismissToast);
   return (
@@ -691,7 +724,7 @@ function AchievementToasts() {
             >
               <div className="shrink-0 animate-coin-pop"><AchievementIcon icon={ach.icon} size={28} /></div>
               <div className="min-w-0">
-                <div className="text-2xs uppercase tracking-widest text-brass-600 font-display">Achievement unlocked</div>
+                <div className="text-2xs uppercase tracking-widest text-brass-600 font-display">{ui('ach.unlocked')}</div>
                 <div className="font-display text-ink leading-tight">{ach.label}</div>
                 <div className="text-2xs text-ink-soft truncate">{ach.description}</div>
               </div>
@@ -707,6 +740,7 @@ function AchievementToasts() {
 // Chart + log bodies (inside HistoryPanel tabs)
 // ============================================================
 function ChartBody({ data }: { data: { tick: number; netWorth: number; cash: number }[] }) {
+  const { t } = useT();
   const ghost = useMemo(() => loadGhost(), []);
   const merged = useMemo(() => {
     if (!ghost) return data;
@@ -717,13 +751,13 @@ function ChartBody({ data }: { data: { tick: number; netWorth: number; cash: num
     return (
       <div className="h-[180px] flex flex-col items-center justify-center text-center text-ink-faint">
         <Pawn size={32} />
-        <p className="text-xs mt-2">Roll the dice to start your story.<br />Your wealth curve grows here.</p>
+        <p className="text-xs mt-2">{t('history.chartEmpty')}<br />{t('history.chartEmptySub')}</p>
       </div>
     );
   }
   return (
     <>
-      {ghost && <div className="text-2xs text-ink-faint flex items-center gap-1 mb-1"><span className="inline-block w-3 border-t border-dashed border-ink-faint" /> dashed = your best run</div>}
+      {ghost && <div className="text-2xs text-ink-faint flex items-center gap-1 mb-1"><span className="inline-block w-3 border-t border-dashed border-ink-faint" /> {t('history.bestRun')}</div>}
       <div style={{ width: '100%', height: 200 }}>
         <ResponsiveContainer>
           <LineChart data={merged}>
@@ -742,9 +776,10 @@ function ChartBody({ data }: { data: { tick: number; netWorth: number; cash: num
 }
 
 function LogBody({ notes }: { notes: string[] }) {
+  const { t } = useT();
   return (
     <ul className="text-sm text-ink-soft space-y-1 max-h-52 overflow-auto pr-1">
-      {notes.length === 0 && <li className="text-ink-faint italic">Roll the dice to begin.</li>}
+      {notes.length === 0 && <li className="text-ink-faint italic">{t('history.logEmpty')}</li>}
       {[...notes].reverse().map((n, i) => <li key={i} className="leading-snug">{n}</li>)}
     </ul>
   );
@@ -759,6 +794,7 @@ function CardModal({ card }: { card: Card }) {
   const applyAction = useGameStore((s) => s.applyAction);
   const coachMode = useGameStore((s) => s.coachMode);
   const state = useGameStore((s) => s.state)!;
+  const { t: ui, L } = useT();
   const t = Math.min(5, Math.max(1, card.temptation));
   const visibleOptions = t >= 5 ? card.options.filter((o) => o.id !== 'skip') : card.options;
   const [financeOpen, setFinanceOpen] = useState(false);
@@ -773,8 +809,8 @@ function CardModal({ card }: { card: Card }) {
         <div className="bg-wood-700 text-card px-5 py-3 flex items-center gap-3">
           <span className="text-3xl" aria-hidden>{card.emoji}</span>
           <div className="flex-1 min-w-0">
-            <div id="card-title" className="font-display text-lg leading-tight">{card.title}</div>
-            {card.subtitle && <div className="text-2xs opacity-90 capitalize">{card.subtitle}</div>}
+            <div id="card-title" className="font-display text-lg leading-tight">{L(card.title)}</div>
+            {card.subtitle && <div className="text-2xs opacity-90 capitalize">{L(card.subtitle)}</div>}
           </div>
         </div>
 
@@ -782,23 +818,23 @@ function CardModal({ card }: { card: Card }) {
         <div className={`px-5 py-2.5 border-b border-card-edge ${t >= 4 ? 'bg-expense-soft' : t >= 3 ? 'bg-caution-soft' : 'bg-card-edge'}`}>
           <div className="flex items-center justify-between">
             <div className="text-xs font-semibold uppercase tracking-wide text-ink font-display">
-              {t >= 5 ? 'Unavoidable' : t >= 4 ? 'Very tempting' : t >= 3 ? 'Tempting' : t >= 2 ? 'Mild pull' : 'Take it or leave it'}
+              {ui(`temptation.${t}` as 'temptation.5')}
             </div>
             {/* Fixed-size meter: earned levels are solid coins, the rest hollow + desaturated slots */}
-            <div className="flex gap-1 items-center" aria-label={`Temptation ${t} of 5`}>
+            <div className="flex gap-1 items-center" aria-label={ui('temptation.aria', { t })}>
               {[1, 2, 3, 4, 5].map((i) => <Coin key={i} size={16} empty={i > t} />)}
             </div>
           </div>
-          <div className="text-sm italic text-ink mt-1 leading-snug">"{card.temptationReason}"</div>
+          <div className="text-sm italic text-ink mt-1 leading-snug">"{L(card.temptationReason)}"</div>
         </div>
 
         <div className="p-5 space-y-3 overflow-y-auto">
-          <p className="text-base text-ink leading-relaxed">{card.description}</p>
+          <p className="text-base text-ink leading-relaxed">{L(card.description)}</p>
           {card.rows && (
             <div className="rounded-lg bg-card-edge p-3 text-sm space-y-1.5 ring-1 ring-[oklch(0.34_0.04_50)/0.15]">
               {card.rows.map((r, i) => (
                 <div key={i} className="flex justify-between">
-                  <span className="text-ink-soft font-medium">{r.label}</span>
+                  <span className="text-ink-soft font-medium">{L(r.label)}</span>
                   <span className="font-bold text-ink tnum">{r.value}</span>
                 </div>
               ))}
@@ -808,17 +844,17 @@ function CardModal({ card }: { card: Card }) {
             <div className="rounded-lg bg-income-soft p-3 text-sm leading-relaxed ring-1 ring-income/40">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <CoachMascot mood="happy" size={18} />
-                <span className="font-display font-semibold text-income-ink text-xs uppercase tracking-wider">Coach</span>
+                <span className="font-display font-semibold text-income-ink text-xs uppercase tracking-wider">{ui('coach.label')}</span>
               </div>
-              <p className="text-income-ink">{card.coachNote}</p>
+              <p className="text-income-ink">{L(card.coachNote)}</p>
             </div>
           )}
           <div className="text-sm text-ink-soft flex items-center gap-1.5">
-            You hold <Coin size={14} /> <span className="font-bold text-ink tnum">{formatINR(state.cashOnHand)}</span>
+            {ui('card.youHold')} <Coin size={14} /> <span className="font-bold text-ink tnum">{formatINR(state.cashOnHand)}</span>
           </div>
           {t >= 5 && (
             <div className="rounded-lg bg-expense-soft ring-2 ring-expense px-3 py-2.5 text-sm text-expense-ink font-bold flex items-center gap-2">
-              You can't walk away. {visibleOptions.length === 1 ? "It's happening." : 'Pick how you pay.'}
+              {ui('card.cantWalk')} {visibleOptions.length === 1 ? ui('card.itsHappening') : ui('card.pickHowPay')}
             </div>
           )}
           {/* Quick finances panel — see cash/loans, borrow, sell right from the card */}
@@ -829,9 +865,9 @@ function CardModal({ card }: { card: Card }) {
             >
               <div className="flex items-center gap-2">
                 <Coin size={16} />
-                <span className="font-display text-sm text-ink font-semibold">Your finances</span>
+                <span className="font-display text-sm text-ink font-semibold">{ui('card.yourFinances')}</span>
                 <span className="text-xs text-ink-soft tnum">
-                  cash <b className={state.cashOnHand < 0 ? 'text-expense-ink' : 'text-income-ink'}>{formatINR(state.cashOnHand, { compact: true })}</b>
+                  {ui('card.cash')} <b className={state.cashOnHand < 0 ? 'text-expense-ink' : 'text-income-ink'}>{formatINR(state.cashOnHand, { compact: true })}</b>
                 </span>
               </div>
               <span className={`text-ink-faint text-sm transition-transform ${financeOpen ? 'rotate-180' : ''}`}>▾</span>
@@ -855,8 +891,9 @@ function CardModal({ card }: { card: Card }) {
               const showBorrow = !!cantAfford && o.cashCost && state.cashOnHand < o.cashCost;
               const shortfall = o.cashCost ? Math.max(0, o.cashCost - state.cashOnHand) : 0;
               const borrowAmount = Math.ceil(shortfall / 10_000) * 10_000;
-              const warnTone = o.coachWarning?.startsWith('WORST') ? 'bg-expense-soft text-expense-ink ring-1 ring-expense/50'
-                : o.coachWarning?.startsWith('Best') ? 'bg-income-soft text-income-ink ring-1 ring-income/50' : 'bg-caution-soft text-caution-ink ring-1 ring-caution/50';
+              const warn = o.coachWarning ? L(o.coachWarning) : undefined;
+              const warnTone = warn?.startsWith('WORST') ? 'bg-expense-soft text-expense-ink ring-1 ring-expense/50'
+                : warn?.startsWith('Best') ? 'bg-income-soft text-income-ink ring-1 ring-income/50' : 'bg-caution-soft text-caution-ink ring-1 ring-caution/50';
               return (
                 <div key={o.id} className="space-y-1.5">
                   <button
@@ -871,17 +908,17 @@ function CardModal({ card }: { card: Card }) {
                           : 'bg-brass-500 enabled:hover:bg-brass-600 text-wood-900',
                     ].join(' ')}
                   >
-                    <div className="font-display text-base">{o.label}</div>
-                    {o.detail && <div className="text-sm mt-0.5 opacity-80">{o.detail}</div>}
+                    <div className="font-display text-base">{L(o.label)}</div>
+                    {o.detail && <div className="text-sm mt-0.5 opacity-80">{L(o.detail)}</div>}
                     {cantAfford && <div className="text-sm text-expense-ink mt-0.5 font-semibold">{cantAfford}</div>}
                   </button>
-                  {coachMode && o.coachWarning && <div className={`text-xs leading-snug px-3 py-2 rounded ${warnTone}`}>{o.coachWarning}</div>}
+                  {coachMode && warn && <div className={`text-xs leading-snug px-3 py-2 rounded ${warnTone}`}>{warn}</div>}
                   {showBorrow && (
                     <button onClick={() => { play('coin'); resolveWithLoan(o.id, 'personal'); }} className="btn-3d w-full text-left px-4 py-2.5 bg-expense-soft border-2 border-expense enabled:hover:bg-expense/20">
                       <div className="text-sm font-display font-bold text-expense-ink flex items-center gap-1.5">
-                        <Coin size={15} /> Borrow ₹{borrowAmount.toLocaleString('en-IN')} &amp; buy {t >= 5 && <span className="ml-1 text-xs bg-expense text-card rounded px-1.5 py-0.5 font-bold">forced</span>}
+                        <Coin size={15} /> {ui('card.borrowBuy', { x: borrowAmount.toLocaleString('en-IN') })} {t >= 5 && <span className="ml-1 text-xs bg-expense text-card rounded px-1.5 py-0.5 font-bold">{ui('card.forced')}</span>}
                       </div>
-                      <div className="text-xs text-expense-ink font-medium mt-0.5">Personal loan @ 13.5% p.a., 3yr</div>
+                      <div className="text-xs text-expense-ink font-medium mt-0.5">{ui('card.personalLoanTerms')}</div>
                     </button>
                   )}
                 </div>
@@ -1024,6 +1061,7 @@ function CardFinancePanel({ state, applyAction }: { state: ReturnType<typeof use
 // Outcome modal
 // ============================================================
 function OutcomeModal({ status }: { status: 'won' | 'lost' }) {
+  const { t } = useT();
   const dismiss = useGameStore((s) => s.dismissOutcome);
   const reset = useGameStore((s) => s.reset);
   const resetProgress = useProgression((s) => s.resetForNewRun);
@@ -1047,22 +1085,22 @@ function OutcomeModal({ status }: { status: 'won' | 'lost' }) {
       >
         <div className="text-card px-6 py-5 text-center shrink-0" style={{ background: won ? 'linear-gradient(135deg, oklch(0.74 0.13 80), oklch(0.62 0.12 78))' : 'linear-gradient(135deg, oklch(0.45 0.16 26), oklch(0.32 0.12 24))' }}>
           <div className="text-5xl mb-1">{won ? '★' : '✖'}</div>
-          <div id="outcome-title" className="font-display text-2xl">{won ? 'Rat race escaped!' : 'Bankrupt'}</div>
+          <div id="outcome-title" className="font-display text-2xl">{won ? t('outcome.won') : t('outcome.lost')}</div>
           <div className="text-sm opacity-95 mt-1">
-            {won ? `${state.player.name} reached freedom in ${years}y ${months}m` : `${state.player.name} ran dry for ${BANKRUPTCY_GRACE_MONTHS} straight months`}
+            {won ? t('outcome.wonSub', { name: state.player.name, y: years, m: months }) : t('outcome.lostSub', { name: state.player.name, n: BANKRUPTCY_GRACE_MONTHS })}
           </div>
         </div>
         <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
           {score && <Scorecard score={score} unlockedCount={unlocked.length} />}
           <div className="rounded-lg bg-card-edge/50 p-3 space-y-1 text-sm tnum">
-            <ResultRow label="Net worth" value={formatINR(state.statement.netWorth)} tone={state.statement.netWorth >= 0 ? 'income' : 'expense'} />
-            {won && <ResultRow label="Passive income" value={`${formatINR(state.statement.passiveIncome)}/mo`} tone="income" />}
-            <ResultRow label="Survived" value={`${years}y ${months}m`} />
-            {best && <ResultRow label={isNewBest ? '★ New best escape' : 'Your best escape'} value={`${Math.floor(best.months / 12)}y ${best.months % 12}m`} tone={isNewBest ? 'income' : undefined} />}
+            <ResultRow label={t('hud.netWorth')} value={formatINR(state.statement.netWorth)} tone={state.statement.netWorth >= 0 ? 'income' : 'expense'} />
+            {won && <ResultRow label={t('outcome.passiveIncome')} value={`${formatINR(state.statement.passiveIncome)}/mo`} tone="income" />}
+            <ResultRow label={t('outcome.survived')} value={`${years}y ${months}m`} />
+            {best && <ResultRow label={isNewBest ? t('outcome.newBest') : t('outcome.yourBest')} value={`${Math.floor(best.months / 12)}y ${best.months % 12}m`} tone={isNewBest ? 'income' : undefined} />}
           </div>
           <div className="space-y-2">
-            <PrimaryButton onClick={newRun} className="w-full">Start a new run</PrimaryButton>
-            <button onClick={dismiss} className="btn-3d w-full bg-card text-ink px-4 py-2.5 text-sm">{won ? 'Keep playing' : 'View the wreckage'}</button>
+            <PrimaryButton onClick={newRun} className="w-full">{t('outcome.newRun')}</PrimaryButton>
+            <button onClick={dismiss} className="btn-3d w-full bg-card text-ink px-4 py-2.5 text-sm">{won ? t('outcome.keepPlaying') : t('outcome.viewWreckage')}</button>
           </div>
         </div>
       </motion.div>
