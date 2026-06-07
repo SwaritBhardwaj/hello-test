@@ -59,6 +59,11 @@ function compounded30yMonthly(monthly: number): number {
 
 const lakh = 100_000;
 
+/** Pick one item from a list using the card RNG — used for narrative variety. */
+function oneOf<T>(rng: PRNG, arr: readonly T[]): T {
+  return arr[Math.floor(rng.next() * arr.length)];
+}
+
 function newId(prefix: string, state: GameState): string {
   return `${prefix}_${state.meta.tick}_${Math.floor(Math.random() * 1e6)}`;
 }
@@ -152,7 +157,12 @@ function realEstateCard(state: GameState, rng: PRNG): Card {
     emoji: isCommercial ? '🏢' : '🏠',
     title: `${pick.label.charAt(0).toUpperCase() + pick.label.slice(1)} in ${city}`,
     subtitle: `Market: ${state.market.phase}`,
-    description: `A ${pick.label} is on the market. Yield from rent: ~${(pick.rentPctAnnual * 100).toFixed(1)}% p.a.`,
+    description:
+      oneOf(rng, [
+        `A broker calls at 9pm: "Sir, a ${pick.label} in ${city}, ₹${(price / lakh).toFixed(1)}L — and honestly, three other parties are looking."`,
+        `Your uncle forwards a listing on the family WhatsApp: a ${pick.label} in ${city} for ₹${(price / lakh).toFixed(1)}L. "Property never goes down, beta."`,
+        `You tour a ${pick.label} in ${city} on a Sunday. The builder's agent hands you chai and a ₹${(price / lakh).toFixed(1)}L quote before you've taken your shoes off.`,
+      ]) + ` It would rent for about ${(pick.rentPctAnnual * 100).toFixed(1)}% a year.`,
     rows: [
       { label: 'Price', value: `₹${(price / lakh).toFixed(1)}L` },
       { label: 'Monthly rent', value: `₹${monthlyRent.toLocaleString('en-IN')}` },
@@ -242,7 +252,12 @@ function stockCard(state: GameState, rng: PRNG): Card {
     emoji: '📈',
     title: `${pick.sym} — ${pick.sector}`,
     subtitle: `Market: ${state.market.phase}`,
-    description: `Equity in ${pick.sym}. High volatility; can be sold any month from the balance sheet.`,
+    description:
+      oneOf(rng, [
+        `Your office group chat won't shut up about ${pick.sym}. Someone just posted a green P&L screenshot. It's at ₹${basePrice.toLocaleString('en-IN')}.`,
+        `A "tip" lands in your DMs: ${pick.sym} (${pick.sector}) is "about to run." The chart does look exciting at ₹${basePrice.toLocaleString('en-IN')}.`,
+        `A finance YouTuber just made ${pick.sym} their "high-conviction pick of the month." Trading at ₹${basePrice.toLocaleString('en-IN')}.`,
+      ]) + ` Single stock — high volatility; sellable any month from your balance sheet.`,
     rows: [
       { label: 'Price/share', value: `₹${basePrice.toLocaleString('en-IN')}` },
       { label: 'Suggested lot', value: `${lotSize} shares` },
@@ -296,7 +311,13 @@ function indexFundCard(state: GameState, rng: PRNG): Card {
     emoji: pick.kind === 'reit' ? '🏛️' : '📊',
     title: pick.name,
     subtitle: 'SIP-eligible',
-    description: `Diversified equity exposure. Lower variance than individual stocks.`,
+    description:
+      pick.kind === 'reit'
+        ? `Your colleague who "doesn't do stocks" mentions ${pick.name} — owning rental buildings without the tenant headaches. NAV ₹${nav}.`
+        : oneOf(rng, [
+            `Your most boring, most reliable friend has quietly SIP-ed into ${pick.name} for years. "Just start," she shrugs. NAV ₹${nav}.`,
+            `No tip, no hype — just ${pick.name} tracking the whole market at a rock-bottom fee. NAV ₹${nav}. (The dopamine is in the compounding.)`,
+          ]),
     rows: [
       { label: 'NAV', value: `₹${nav}` },
       { label: 'Suggested SIP lot', value: `${units} units = ₹${cost.toLocaleString('en-IN')}` },
@@ -344,7 +365,11 @@ function goldCard(state: GameState, rng: PRNG): Card {
     emoji: '🥇',
     title: 'Sovereign Gold Bond',
     subtitle: 'Hedge against inflation',
-    description: 'Government-backed gold bond. 2.5% nominal interest + price appreciation.',
+    description:
+      oneOf(rng, [
+        `It's Dhanteras. Your mother reminds you — again — that gold is the only thing that's never betrayed the family. Today's rate: ₹${pricePerGm.toLocaleString('en-IN')}/gm.`,
+        `Wedding season is coming and so is the lecture about "real assets." A Sovereign Gold Bond skips the jeweller's making charges at ₹${pricePerGm.toLocaleString('en-IN')}/gm.`,
+      ]) + ' SGBs pay 2.5% interest on top of the price — no locker, no purity worries.',
     rows: [
       { label: 'Price/gm', value: `₹${pricePerGm.toLocaleString('en-IN')}` },
       { label: 'Lot', value: `${grams}g` },
@@ -381,11 +406,16 @@ function goldCard(state: GameState, rng: PRNG): Card {
 
 function businessCard(state: GameState, rng: PRNG): Card {
   const ventures = [
-    { name: 'Cloud kitchen franchise', cost: 8 * lakh, monthlyProfit: 25_000, risk: 'medium' },
-    { name: 'Coffee cart', cost: 3 * lakh, monthlyProfit: 12_000, risk: 'low' },
-    { name: 'D2C apparel brand', cost: 15 * lakh, monthlyProfit: 40_000, risk: 'high' },
-    { name: 'Tuition center', cost: 5 * lakh, monthlyProfit: 18_000, risk: 'low' },
-    { name: 'Friend\'s startup (angel)', cost: 5 * lakh, monthlyProfit: 0, risk: 'very high' },
+    { name: 'Cloud kitchen franchise', cost: 8 * lakh, monthlyProfit: 25_000, risk: 'medium',
+      pitch: 'A franchise rep shows you glossy unit economics over a tasting platter. "Break-even in 14 months, guaranteed brand pull."' },
+    { name: 'Coffee cart', cost: 3 * lakh, monthlyProfit: 12_000, risk: 'low',
+      pitch: 'A spot opens up outside the metro station. You can already picture the morning queue of office-goers.' },
+    { name: 'D2C apparel brand', cost: 15 * lakh, monthlyProfit: 40_000, risk: 'high',
+      pitch: 'Your designer cousin has the Instagram following and the samples. "We just need inventory and ad spend," she says.' },
+    { name: 'Tuition center', cost: 5 * lakh, monthlyProfit: 18_000, risk: 'low',
+      pitch: 'Parents in your area are desperate for good coaching. A retired teacher offers to run the classes if you fund the place.' },
+    { name: 'Friend\'s startup (angel)', cost: 5 * lakh, monthlyProfit: 0, risk: 'very high',
+      pitch: 'Your friend pitches over chai, eyes shining: "₹5L for 0.5%. We\'ll be the next big thing — get in early."' },
   ];
   const pick = ventures[Math.floor(rng.next() * ventures.length)];
   const yieldAnnual = pick.cost > 0 ? (pick.monthlyProfit * 12) / pick.cost : 0;
@@ -395,7 +425,7 @@ function businessCard(state: GameState, rng: PRNG): Card {
     emoji: '💼',
     title: pick.name,
     subtitle: `Risk: ${pick.risk}`,
-    description: 'Side business opportunity. Illiquid; treat as long-term commitment.',
+    description: `${pick.pitch} (Illiquid — treat it as a long-term commitment.)`,
     rows: [
       { label: 'Investment', value: `₹${(pick.cost / lakh).toFixed(1)}L` },
       { label: 'Expected monthly', value: `₹${pick.monthlyProfit.toLocaleString('en-IN')}` },
@@ -517,10 +547,14 @@ function resistLabel(temptation: number): string {
 
 function sideHustleCard(state: GameState, rng: PRNG): Card {
   const gigs = [
-    { name: 'Weekend consulting', monthly: 25_000, months: 6 },
-    { name: 'Online course royalties', monthly: 8_000, months: 24 },
-    { name: 'Freelance design contract', monthly: 18_000, months: 4 },
-    { name: 'Rental of spare room', monthly: 12_000, months: 12 },
+    { name: 'Weekend consulting', monthly: 25_000, months: 6,
+      pitch: 'An ex-manager pings you: "Two days a month of your brain, decent money. Interested?"' },
+    { name: 'Online course royalties', monthly: 8_000, months: 24,
+      pitch: 'You finally record that course you keep talking about. It could trickle in royalties for years.' },
+    { name: 'Freelance design contract', monthly: 18_000, months: 4,
+      pitch: 'A startup needs a freelancer "yesterday." Good rate, tight deadlines, your evenings.' },
+    { name: 'Rental of spare room', monthly: 12_000, months: 12,
+      pitch: 'The spare room is just collecting boxes. A verified tenant on the app is ready to move in.' },
   ];
   const pick = gigs[Math.floor(rng.next() * gigs.length)];
   return {
@@ -529,7 +563,7 @@ function sideHustleCard(state: GameState, rng: PRNG): Card {
     emoji: '⚡',
     title: pick.name,
     subtitle: 'Side hustle',
-    description: `Adds ₹${pick.monthly.toLocaleString('en-IN')}/mo for ~${pick.months} months. Costs evenings.`,
+    description: `${pick.pitch} It adds about ₹${pick.monthly.toLocaleString('en-IN')}/mo — but the time has to come from somewhere.`,
     rows: [
       { label: 'Income', value: `₹${pick.monthly.toLocaleString('en-IN')}/mo` },
       { label: 'Duration', value: `${pick.months} months (simplified: forever in v0.2)` },
@@ -820,7 +854,11 @@ function borrowOfferCard(state: GameState, rng: PRNG): Card {
     emoji: pick.emoji,
     title: pick.label,
     subtitle: `${(rate * 100).toFixed(1)}% p.a.`,
-    description: 'Borrowed money is real money — and so is the EMI.',
+    description:
+      oneOf(rng, [
+        `Your banking app flashes a pre-approved ${pick.label.toLowerCase()}: "₹${(pick.principal / lakh).toFixed(1)}L, instant disbursal, tap to accept." The button is a very inviting shade of green.`,
+        `A bank caller knows your name and your salary: "Sir, you're pre-qualified for ₹${(pick.principal / lakh).toFixed(1)}L. Shall I just get it processed?"`,
+      ]) + ' Borrowed money is real money — and so is the EMI.',
     rows: [
       { label: 'Principal', value: `₹${(pick.principal / lakh).toFixed(1)}L` },
       { label: 'Tenure', value: `${pick.tenureMonths} months` },
@@ -850,7 +888,7 @@ function borrowOfferCard(state: GameState, rng: PRNG): Card {
   };
 }
 
-function paydayBonusCard(state: GameState, _rng: PRNG): Card {
+function paydayBonusCard(state: GameState, rng: PRNG): Card {
   const salary = state.incomeStreams.find((i) => i.kind === 'salary')?.monthlyGross ?? 0;
   const bonus = Math.round(salary * (0.5 + Math.random() * 1.5));
   return {
@@ -859,7 +897,11 @@ function paydayBonusCard(state: GameState, _rng: PRNG): Card {
     emoji: '🎉',
     title: 'Performance bonus!',
     subtitle: 'Lump sum from employer',
-    description: `Your manager hands you a bonus of ₹${bonus.toLocaleString('en-IN')}.`,
+    description: oneOf(rng, [
+      `Appraisal cycle closes well. Your manager slides an envelope across the desk: ₹${bonus.toLocaleString('en-IN')}.`,
+      `The company beat its targets and you got a shout-out. A surprise ₹${bonus.toLocaleString('en-IN')} lands in your account.`,
+      `Diwali bonus season. HR drops a mail: ₹${bonus.toLocaleString('en-IN')} credited. It already feels spent.`,
+    ]),
     rows: [{ label: 'Bonus', value: `₹${bonus.toLocaleString('en-IN')}` }],
     options: [
       {

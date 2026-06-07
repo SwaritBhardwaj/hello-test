@@ -117,3 +117,29 @@ describe('temptation realism: level 5 means "unavoidable", not "strong want"', (
     expect(after).toBeLessThan(before);
   });
 });
+
+describe('every card reads like a real-life scene, not a spec line', () => {
+  const cards = sampleCards();
+
+  it('all cards carry a narrative description and a flavor reason', () => {
+    for (const c of cards) {
+      expect(c.description.trim().length).toBeGreaterThanOrEqual(25);
+      expect(c.temptationReason.trim().length).toBeGreaterThanOrEqual(12);
+    }
+  });
+
+  it('deal / side-hustle / borrow cards are no longer the old generic blurbs', () => {
+    const stale = [
+      'A flat is on the market',
+      'Equity in',
+      'Diversified equity exposure. Lower variance than individual stocks.',
+      'Government-backed gold bond. 2.5% nominal interest + price appreciation.',
+      'Side business opportunity. Illiquid; treat as long-term commitment.',
+      'Borrowed money is real money — and so is the EMI.',
+    ];
+    const narrativeKinds = new Set(['deal_real_estate', 'deal_stock', 'deal_index_fund', 'deal_gold', 'deal_business', 'side_hustle', 'borrow_offer']);
+    for (const c of cards.filter((x) => narrativeKinds.has(x.kind))) {
+      for (const phrase of stale) expect(c.description).not.toBe(phrase);
+    }
+  });
+});
