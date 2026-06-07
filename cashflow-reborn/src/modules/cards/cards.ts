@@ -2,6 +2,7 @@ import type { GameState, AssetClass, RealEstateMeta, LoanKind } from '@/types';
 import { PRNG } from '@/engine/prng/prng';
 import { buildLoan } from '@/modules/loans/loans';
 import { LOAN_RATES } from '@/data/constants';
+import { loc, type Loc } from '@/i18n/loc';
 
 export type CardKind =
   | 'deal_real_estate'
@@ -18,32 +19,32 @@ export type CardKind =
 
 export interface CardOption {
   id: string;
-  label: string;
-  detail?: string;
+  label: Loc;
+  detail?: Loc;
   apply: (state: GameState) => string;
   affordCheck?: (state: GameState) => string | null;
   /** Cash needed for this option. If set and cash < cashCost, the UI offers a
    *  "Borrow & buy" alternative that takes a personal loan to cover the gap. */
   cashCost?: number;
   /** Coach-mode warning: shown under the button to teach what choosing this means. */
-  coachWarning?: string;
+  coachWarning?: Loc;
 }
 
 export interface Card {
   id: string;
   kind: CardKind;
   emoji: string;
-  title: string;
-  subtitle?: string;
-  description: string;
-  rows?: { label: string; value: string }[];
+  title: Loc;
+  subtitle?: Loc;
+  description: Loc;
+  rows?: { label: Loc; value: string }[];
   options: CardOption[];
   /** 1 = barely tempting, 5 = "you NEED this". UX nudge only. */
   temptation: number;
   /** One-line flavor explaining the temptation. */
-  temptationReason: string;
+  temptationReason: Loc;
   /** Coach-mode lesson: the financial concept behind this card. */
-  coachNote?: string;
+  coachNote?: Loc;
 }
 
 /** Compound a one-time cost over N years to show "the real cost". */
@@ -155,24 +156,35 @@ function realEstateCard(state: GameState, rng: PRNG): Card {
     id: newId('card', state),
     kind: 'deal_real_estate',
     emoji: isCommercial ? '🏢' : '🏠',
-    title: `${pick.label.charAt(0).toUpperCase() + pick.label.slice(1)} in ${city}`,
-    subtitle: `Market: ${state.market.phase}`,
-    description:
-      oneOf(rng, [
-        `A broker calls at 9pm: "Sir, a ${pick.label} in ${city}, ₹${(price / lakh).toFixed(1)}L — and honestly, three other parties are looking."`,
-        `Your uncle forwards a listing on the family WhatsApp: a ${pick.label} in ${city} for ₹${(price / lakh).toFixed(1)}L. "Property never goes down, beta."`,
-        `You tour a ${pick.label} in ${city} on a Sunday. The builder's agent hands you chai and a ₹${(price / lakh).toFixed(1)}L quote before you've taken your shoes off.`,
-      ]) + ` It would rent for about ${(pick.rentPctAnnual * 100).toFixed(1)}% a year.`,
+    title: loc(`${pick.label.charAt(0).toUpperCase() + pick.label.slice(1)} in ${city}`, `${city} में ${pick.label}`),
+    subtitle: loc(`Market: ${state.market.phase}`, `बाज़ार: ${state.market.phase}`),
+    description: oneOf(rng, [
+      loc(
+        `A broker calls at 9pm: "Sir, a ${pick.label} in ${city}, ₹${(price / lakh).toFixed(1)}L — and honestly, three other parties are looking." It would rent for about ${(pick.rentPctAnnual * 100).toFixed(1)}% a year.`,
+        `रात 9 बजे ब्रोकर का फ़ोन: "सर, ${city} में एक ${pick.label}, ₹${(price / lakh).toFixed(1)}L — और सच कहूँ तो तीन और पार्टियाँ देख रही हैं।" किराये से सालाना करीब ${(pick.rentPctAnnual * 100).toFixed(1)}% मिलेगा।`,
+      ),
+      loc(
+        `Your uncle forwards a listing on the family WhatsApp: a ${pick.label} in ${city} for ₹${(price / lakh).toFixed(1)}L. "Property never goes down, beta." It would rent for about ${(pick.rentPctAnnual * 100).toFixed(1)}% a year.`,
+        `अंकल ने फैमिली व्हाट्सऐप पर लिस्टिंग भेजी: ${city} में ${pick.label}, ₹${(price / lakh).toFixed(1)}L। "प्रॉपर्टी कभी नीचे नहीं जाती, बेटा।" किराये से सालाना करीब ${(pick.rentPctAnnual * 100).toFixed(1)}% मिलेगा।`,
+      ),
+      loc(
+        `You tour a ${pick.label} in ${city} on a Sunday. The builder's agent hands you chai and a ₹${(price / lakh).toFixed(1)}L quote before you've taken your shoes off. It rents for about ${(pick.rentPctAnnual * 100).toFixed(1)}% a year.`,
+        `रविवार को आप ${city} में एक ${pick.label} देखने जाते हैं। जूते उतारने से पहले ही बिल्डर का एजेंट चाय और ₹${(price / lakh).toFixed(1)}L का भाव थमा देता है। किराये से सालाना करीब ${(pick.rentPctAnnual * 100).toFixed(1)}%।`,
+      ),
+    ]),
     rows: [
-      { label: 'Price', value: `₹${(price / lakh).toFixed(1)}L` },
-      { label: 'Monthly rent', value: `₹${monthlyRent.toLocaleString('en-IN')}` },
-      { label: '25% down + costs', value: `₹${(totalCash / lakh).toFixed(1)}L` },
-      { label: 'EMI (20y @ 8.5%)', value: `₹${homeEMI.toLocaleString('en-IN')}/mo` },
+      { label: loc('Price', 'कीमत'), value: `₹${(price / lakh).toFixed(1)}L` },
+      { label: loc('Monthly rent', 'मासिक किराया'), value: `₹${monthlyRent.toLocaleString('en-IN')}` },
+      { label: loc('25% down + costs', '25% डाउन + खर्च'), value: `₹${(totalCash / lakh).toFixed(1)}L` },
+      { label: loc('EMI (20y @ 8.5%)', 'ईएमआई (20 साल @ 8.5%)'), value: `₹${homeEMI.toLocaleString('en-IN')}/mo` },
     ],
     options: [
       {
         id: 'cash',
-        label: `Buy outright (₹${(price / lakh).toFixed(1)}L + ₹${(closingCosts / lakh).toFixed(1)}L costs)`,
+        label: loc(
+          `Buy outright (₹${(price / lakh).toFixed(1)}L + ₹${(closingCosts / lakh).toFixed(1)}L costs)`,
+          `पूरा नकद खरीदें (₹${(price / lakh).toFixed(1)}L + ₹${(closingCosts / lakh).toFixed(1)}L खर्च)`,
+        ),
         cashCost: price + closingCosts,
         affordCheck: (s) =>
           s.cashOnHand < price + closingCosts
@@ -193,11 +205,15 @@ function realEstateCard(state: GameState, rng: PRNG): Card {
       },
       {
         id: 'loan',
-        label: `Buy with ₹${(totalCash / lakh).toFixed(1)}L down + home loan`,
+        label: loc(
+          `Buy with ₹${(totalCash / lakh).toFixed(1)}L down + home loan`,
+          `₹${(totalCash / lakh).toFixed(1)}L डाउन + होम लोन से खरीदें`,
+        ),
         cashCost: totalCash,
-        detail: `EMI ₹${homeEMI.toLocaleString('en-IN')}/mo · cashflow ${
-          monthlyRent - homeEMI >= 0 ? '+' : ''
-        }₹${(monthlyRent - homeEMI).toLocaleString('en-IN')}/mo`,
+        detail: loc(
+          `EMI ₹${homeEMI.toLocaleString('en-IN')}/mo · cashflow ${monthlyRent - homeEMI >= 0 ? '+' : ''}₹${(monthlyRent - homeEMI).toLocaleString('en-IN')}/mo`,
+          `ईएमआई ₹${homeEMI.toLocaleString('en-IN')}/माह · नकद प्रवाह ${monthlyRent - homeEMI >= 0 ? '+' : ''}₹${(monthlyRent - homeEMI).toLocaleString('en-IN')}/माह`,
+        ),
         affordCheck: (s) =>
           s.cashOnHand < totalCash ? `Need ₹${(totalCash / lakh).toFixed(1)}L cash` : null,
         apply: (s) => {
@@ -220,7 +236,7 @@ function realEstateCard(state: GameState, rng: PRNG): Card {
           return `Bought ${pick.label} with loan, EMI ₹${emi.toLocaleString('en-IN')}/mo`;
         },
       },
-      { id: 'skip', label: 'Pass', apply: () => 'Passed on deal' },
+      { id: 'skip', label: loc('Pass', 'छोड़ें'), apply: () => 'Passed on deal' },
     ],
     temptation: isCommercial ? 3 : 4,
     temptationReason: 'Property! Your uncle says it always doubles. Your spouse already mentally lives there.',
@@ -282,7 +298,7 @@ function stockCard(state: GameState, rng: PRNG): Card {
           return `Bought ${lotSize} ${pick.sym}`;
         },
       },
-      { id: 'skip', label: 'Pass', apply: () => 'Passed on stock' },
+      { id: 'skip', label: loc('Pass', 'छोड़ें'), apply: () => 'Passed on stock' },
     ],
     temptation: 3,
     temptationReason: 'A friend on WhatsApp says this is going to 5x by year-end. The chart looks bullish.',
@@ -341,7 +357,7 @@ function indexFundCard(state: GameState, rng: PRNG): Card {
           return `Bought ${units} units of ${pick.name}`;
         },
       },
-      { id: 'skip', label: 'Pass', apply: () => 'Passed' },
+      { id: 'skip', label: loc('Pass', 'छोड़ें'), apply: () => 'Passed' },
     ],
     temptation: 2,
     temptationReason: 'The boring sensible choice. No dopamine, just compounding.',
@@ -393,7 +409,7 @@ function goldCard(state: GameState, rng: PRNG): Card {
           return `Bought ${grams}g gold`;
         },
       },
-      { id: 'skip', label: 'Pass', apply: () => 'Passed' },
+      { id: 'skip', label: loc('Pass', 'छोड़ें'), apply: () => 'Passed' },
     ],
     temptation: 2,
     temptationReason: 'Your mom keeps reminding you that gold has never let her down.',
@@ -449,7 +465,7 @@ function businessCard(state: GameState, rng: PRNG): Card {
           return `Invested in ${pick.name}`;
         },
       },
-      { id: 'skip', label: 'Pass', apply: () => 'Passed' },
+      { id: 'skip', label: loc('Pass', 'छोड़ें'), apply: () => 'Passed' },
     ],
     temptation: 3,
     temptationReason: 'Imagine the LinkedIn announcement. Imagine quitting your job.',
@@ -571,7 +587,7 @@ function sideHustleCard(state: GameState, rng: PRNG): Card {
     options: [
       {
         id: 'accept',
-        label: 'Take it',
+        label: loc('Take it', 'ले लें'),
         apply: (s) => {
           s.incomeStreams.push({
             id: newId('inc', s),
@@ -583,7 +599,7 @@ function sideHustleCard(state: GameState, rng: PRNG): Card {
           return `Took side hustle: ${pick.name}`;
         },
       },
-      { id: 'skip', label: 'Decline', apply: () => 'Declined gig' },
+      { id: 'skip', label: loc('Decline', 'मना करें'), apply: () => 'Declined gig' },
     ],
     temptation: 3,
     temptationReason: 'Easy extra income… but evenings and weekends are not free.',
@@ -877,7 +893,7 @@ function borrowOfferCard(state: GameState, rng: PRNG): Card {
           `Total interest over ${pick.tenureMonths} months ≈ ₹${(emi * pick.tenureMonths - pick.principal).toLocaleString('en-IN')}. ` +
           `If you can't articulate WHY you need this loan right now, decline.`,
       },
-      { id: 'skip', label: 'Decline', apply: () => 'Declined offer' },
+      { id: 'skip', label: loc('Decline', 'मना करें'), apply: () => 'Declined offer' },
     ],
     temptation: 4,
     temptationReason: 'Pre-approved. One tap. Cash in your account by tomorrow.',
@@ -906,7 +922,7 @@ function paydayBonusCard(state: GameState, rng: PRNG): Card {
     options: [
       {
         id: 'take',
-        label: 'Cash it',
+        label: loc('Cash it', 'भुना लें'),
         apply: (s) => {
           s.cashOnHand += bonus;
           return `+₹${bonus.toLocaleString('en-IN')} bonus`;
@@ -938,7 +954,7 @@ function marketEventCard(state: GameState, _rng: PRNG): Card {
       { label: 'Repo rate', value: `${(state.market.repoRate * 100).toFixed(2)}%` },
       { label: 'Inflation', value: `${(state.market.inflationAnnual * 100).toFixed(2)}%` },
     ],
-    options: [{ id: 'ack', label: 'Noted', apply: () => 'Read the news' }],
+    options: [{ id: 'ack', label: loc('Noted', 'समझ गए'), apply: () => 'Read the news' }],
     temptation: 1,
     temptationReason: 'A news headline. The action is what you do next month.',
     coachNote: isUp

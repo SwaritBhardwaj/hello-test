@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore, DAYS_IN_MONTH, BANKRUPTCY_GRACE_MONTHS, trailingNegativeCashMonths } from './store';
+import { useT, useLangStore } from './lang';
+import { LANGS } from '@/i18n/loc';
 import { formatINR } from '@/utils/money';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { LOAN_RATES } from '@/data/constants';
@@ -183,6 +185,7 @@ function SetupScreen() {
 // Main board
 // ============================================================
 function BoardScreen() {
+  const { t } = useT();
   const state = useGameStore((s) => s.state)!;
   const rollDice = useGameStore((s) => s.rollDice);
   const ff = useGameStore((s) => s.fastForward);
@@ -243,25 +246,26 @@ function BoardScreen() {
             </div>
           </div>
           <div className="flex items-center gap-1.5 order-3 sm:order-2 w-full sm:w-auto justify-between sm:justify-end mt-1 sm:mt-0">
-            <MoneyPill label="Net worth" value={state.statement.netWorth} tone={state.statement.netWorth >= 0 ? 'income' : 'expense'} />
-            <MoneyPill label="Cash" value={state.cashOnHand} coin tone={state.cashOnHand < 0 ? 'expense' : 'brass'} />
-            <MoneyPill label="Cashflow" value={state.statement.totalIncome - state.statement.totalExpenses} signed tone={state.statement.totalIncome - state.statement.totalExpenses >= 0 ? 'income' : 'expense'} />
+            <MoneyPill label={t('hud.netWorth')} value={state.statement.netWorth} tone={state.statement.netWorth >= 0 ? 'income' : 'expense'} />
+            <MoneyPill label={t('hud.cash')} value={state.cashOnHand} coin tone={state.cashOnHand < 0 ? 'expense' : 'brass'} />
+            <MoneyPill label={t('hud.cashflow')} value={state.statement.totalIncome - state.statement.totalExpenses} signed tone={state.statement.totalIncome - state.statement.totalExpenses >= 0 ? 'income' : 'expense'} />
           </div>
           <div className="flex items-center gap-1.5 order-2 sm:order-3">
+            <LanguageToggle />
             <CoachStyleToggle />
             <MuteToggle />
             <CoachToggle />
             <button onClick={() => { play('click'); setSheetOpen(true); }} className="btn-3d bg-brass-500 enabled:hover:bg-brass-600 text-wood-900 px-3 py-1.5 text-sm whitespace-nowrap">
-              <span className="hidden sm:inline">Balance sheet</span><span className="sm:hidden">Sheet</span>
+              <span className="hidden sm:inline">{t('hud.balanceSheet')}</span><span className="sm:hidden">{t('hud.sheet')}</span>
             </button>
             <div className="relative">
               <button onClick={() => setMenuOpen((o) => !o)} className="rounded-xl bg-felt-700 hover:bg-felt-600 text-card px-3 py-2 text-sm shadow-piece transition active:scale-95" aria-label="More actions">⋯</button>
               <AnimatePresence>
                 {menuOpen && (
                   <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="absolute right-0 mt-2 w-44 paper rounded-xl shadow-card ring-1 ring-card-edge z-30 overflow-hidden">
-                    <MenuItem onClick={() => { ff(12); setMenuOpen(false); }}>⏩ Skip 1 year</MenuItem>
-                    <MenuItem onClick={() => { ff(60); setMenuOpen(false); }}>⏩ Skip 5 years</MenuItem>
-                    <MenuItem danger onClick={() => { reset(); setMenuOpen(false); }}>⟲ New game</MenuItem>
+                    <MenuItem onClick={() => { ff(12); setMenuOpen(false); }}>{t('menu.skip1y')}</MenuItem>
+                    <MenuItem onClick={() => { ff(60); setMenuOpen(false); }}>{t('menu.skip5y')}</MenuItem>
+                    <MenuItem danger onClick={() => { reset(); setMenuOpen(false); }}>{t('menu.newGame')}</MenuItem>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -293,7 +297,7 @@ function BoardScreen() {
           onClick={handleRoll} disabled={!!currentCard || rolling}
           className="btn-3d w-full bg-brass-500 enabled:hover:bg-brass-600 text-wood-900 text-lg py-3 flex items-center justify-center gap-2"
         >
-          <Die value={lastRoll ?? 6} rolling={rolling} size={30} /> {rolling ? 'Rolling…' : 'ROLL THE DICE'}
+          <Die value={lastRoll ?? 6} rolling={rolling} size={30} /> {rolling ? t('board.rolling') : t('board.rollDice')}
         </button>
       </div>
 
@@ -644,6 +648,26 @@ function MenuItem({ children, onClick, danger }: { children: React.ReactNode; on
   );
 }
 
+/** EN / हिंदी switch — the most prominent way to change language. */
+function LanguageToggle() {
+  const lang = useLangStore((s) => s.lang);
+  const setLang = useLangStore((s) => s.setLang);
+  return (
+    <div className="flex items-center rounded-xl bg-felt-700 shadow-piece overflow-hidden ring-1 ring-card/20" role="group" aria-label="Language">
+      {LANGS.map((l) => (
+        <button
+          key={l.id}
+          onClick={() => { play('click'); setLang(l.id); }}
+          aria-pressed={lang === l.id}
+          className={`px-2.5 py-2 text-sm font-display font-semibold transition active:scale-95 ${lang === l.id ? 'bg-brass-500 text-wood-900' : 'text-card hover:bg-felt-600'}`}
+        >
+          {l.short}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ============================================================
 // Progression UI — level badge, achievement toasts
 // ============================================================
@@ -759,6 +783,7 @@ function CardModal({ card }: { card: Card }) {
   const applyAction = useGameStore((s) => s.applyAction);
   const coachMode = useGameStore((s) => s.coachMode);
   const state = useGameStore((s) => s.state)!;
+  const { t: ui, L } = useT();
   const t = Math.min(5, Math.max(1, card.temptation));
   const visibleOptions = t >= 5 ? card.options.filter((o) => o.id !== 'skip') : card.options;
   const [financeOpen, setFinanceOpen] = useState(false);
@@ -773,8 +798,8 @@ function CardModal({ card }: { card: Card }) {
         <div className="bg-wood-700 text-card px-5 py-3 flex items-center gap-3">
           <span className="text-3xl" aria-hidden>{card.emoji}</span>
           <div className="flex-1 min-w-0">
-            <div id="card-title" className="font-display text-lg leading-tight">{card.title}</div>
-            {card.subtitle && <div className="text-2xs opacity-90 capitalize">{card.subtitle}</div>}
+            <div id="card-title" className="font-display text-lg leading-tight">{L(card.title)}</div>
+            {card.subtitle && <div className="text-2xs opacity-90 capitalize">{L(card.subtitle)}</div>}
           </div>
         </div>
 
@@ -782,23 +807,23 @@ function CardModal({ card }: { card: Card }) {
         <div className={`px-5 py-2.5 border-b border-card-edge ${t >= 4 ? 'bg-expense-soft' : t >= 3 ? 'bg-caution-soft' : 'bg-card-edge'}`}>
           <div className="flex items-center justify-between">
             <div className="text-xs font-semibold uppercase tracking-wide text-ink font-display">
-              {t >= 5 ? 'Unavoidable' : t >= 4 ? 'Very tempting' : t >= 3 ? 'Tempting' : t >= 2 ? 'Mild pull' : 'Take it or leave it'}
+              {ui(`temptation.${t}` as 'temptation.5')}
             </div>
             {/* Fixed-size meter: earned levels are solid coins, the rest hollow + desaturated slots */}
-            <div className="flex gap-1 items-center" aria-label={`Temptation ${t} of 5`}>
+            <div className="flex gap-1 items-center" aria-label={ui('temptation.aria', { t })}>
               {[1, 2, 3, 4, 5].map((i) => <Coin key={i} size={16} empty={i > t} />)}
             </div>
           </div>
-          <div className="text-sm italic text-ink mt-1 leading-snug">"{card.temptationReason}"</div>
+          <div className="text-sm italic text-ink mt-1 leading-snug">"{L(card.temptationReason)}"</div>
         </div>
 
         <div className="p-5 space-y-3 overflow-y-auto">
-          <p className="text-base text-ink leading-relaxed">{card.description}</p>
+          <p className="text-base text-ink leading-relaxed">{L(card.description)}</p>
           {card.rows && (
             <div className="rounded-lg bg-card-edge p-3 text-sm space-y-1.5 ring-1 ring-[oklch(0.34_0.04_50)/0.15]">
               {card.rows.map((r, i) => (
                 <div key={i} className="flex justify-between">
-                  <span className="text-ink-soft font-medium">{r.label}</span>
+                  <span className="text-ink-soft font-medium">{L(r.label)}</span>
                   <span className="font-bold text-ink tnum">{r.value}</span>
                 </div>
               ))}
@@ -808,17 +833,17 @@ function CardModal({ card }: { card: Card }) {
             <div className="rounded-lg bg-income-soft p-3 text-sm leading-relaxed ring-1 ring-income/40">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <CoachMascot mood="happy" size={18} />
-                <span className="font-display font-semibold text-income-ink text-xs uppercase tracking-wider">Coach</span>
+                <span className="font-display font-semibold text-income-ink text-xs uppercase tracking-wider">{ui('coach.label')}</span>
               </div>
-              <p className="text-income-ink">{card.coachNote}</p>
+              <p className="text-income-ink">{L(card.coachNote)}</p>
             </div>
           )}
           <div className="text-sm text-ink-soft flex items-center gap-1.5">
-            You hold <Coin size={14} /> <span className="font-bold text-ink tnum">{formatINR(state.cashOnHand)}</span>
+            {ui('card.youHold')} <Coin size={14} /> <span className="font-bold text-ink tnum">{formatINR(state.cashOnHand)}</span>
           </div>
           {t >= 5 && (
             <div className="rounded-lg bg-expense-soft ring-2 ring-expense px-3 py-2.5 text-sm text-expense-ink font-bold flex items-center gap-2">
-              You can't walk away. {visibleOptions.length === 1 ? "It's happening." : 'Pick how you pay.'}
+              {ui('card.cantWalk')} {visibleOptions.length === 1 ? ui('card.itsHappening') : ui('card.pickHowPay')}
             </div>
           )}
           {/* Quick finances panel — see cash/loans, borrow, sell right from the card */}
@@ -829,9 +854,9 @@ function CardModal({ card }: { card: Card }) {
             >
               <div className="flex items-center gap-2">
                 <Coin size={16} />
-                <span className="font-display text-sm text-ink font-semibold">Your finances</span>
+                <span className="font-display text-sm text-ink font-semibold">{ui('card.yourFinances')}</span>
                 <span className="text-xs text-ink-soft tnum">
-                  cash <b className={state.cashOnHand < 0 ? 'text-expense-ink' : 'text-income-ink'}>{formatINR(state.cashOnHand, { compact: true })}</b>
+                  {ui('card.cash')} <b className={state.cashOnHand < 0 ? 'text-expense-ink' : 'text-income-ink'}>{formatINR(state.cashOnHand, { compact: true })}</b>
                 </span>
               </div>
               <span className={`text-ink-faint text-sm transition-transform ${financeOpen ? 'rotate-180' : ''}`}>▾</span>
@@ -855,8 +880,9 @@ function CardModal({ card }: { card: Card }) {
               const showBorrow = !!cantAfford && o.cashCost && state.cashOnHand < o.cashCost;
               const shortfall = o.cashCost ? Math.max(0, o.cashCost - state.cashOnHand) : 0;
               const borrowAmount = Math.ceil(shortfall / 10_000) * 10_000;
-              const warnTone = o.coachWarning?.startsWith('WORST') ? 'bg-expense-soft text-expense-ink ring-1 ring-expense/50'
-                : o.coachWarning?.startsWith('Best') ? 'bg-income-soft text-income-ink ring-1 ring-income/50' : 'bg-caution-soft text-caution-ink ring-1 ring-caution/50';
+              const warn = o.coachWarning ? L(o.coachWarning) : undefined;
+              const warnTone = warn?.startsWith('WORST') ? 'bg-expense-soft text-expense-ink ring-1 ring-expense/50'
+                : warn?.startsWith('Best') ? 'bg-income-soft text-income-ink ring-1 ring-income/50' : 'bg-caution-soft text-caution-ink ring-1 ring-caution/50';
               return (
                 <div key={o.id} className="space-y-1.5">
                   <button
@@ -871,17 +897,17 @@ function CardModal({ card }: { card: Card }) {
                           : 'bg-brass-500 enabled:hover:bg-brass-600 text-wood-900',
                     ].join(' ')}
                   >
-                    <div className="font-display text-base">{o.label}</div>
-                    {o.detail && <div className="text-sm mt-0.5 opacity-80">{o.detail}</div>}
+                    <div className="font-display text-base">{L(o.label)}</div>
+                    {o.detail && <div className="text-sm mt-0.5 opacity-80">{L(o.detail)}</div>}
                     {cantAfford && <div className="text-sm text-expense-ink mt-0.5 font-semibold">{cantAfford}</div>}
                   </button>
-                  {coachMode && o.coachWarning && <div className={`text-xs leading-snug px-3 py-2 rounded ${warnTone}`}>{o.coachWarning}</div>}
+                  {coachMode && warn && <div className={`text-xs leading-snug px-3 py-2 rounded ${warnTone}`}>{warn}</div>}
                   {showBorrow && (
                     <button onClick={() => { play('coin'); resolveWithLoan(o.id, 'personal'); }} className="btn-3d w-full text-left px-4 py-2.5 bg-expense-soft border-2 border-expense enabled:hover:bg-expense/20">
                       <div className="text-sm font-display font-bold text-expense-ink flex items-center gap-1.5">
-                        <Coin size={15} /> Borrow ₹{borrowAmount.toLocaleString('en-IN')} &amp; buy {t >= 5 && <span className="ml-1 text-xs bg-expense text-card rounded px-1.5 py-0.5 font-bold">forced</span>}
+                        <Coin size={15} /> {ui('card.borrowBuy', { x: borrowAmount.toLocaleString('en-IN') })} {t >= 5 && <span className="ml-1 text-xs bg-expense text-card rounded px-1.5 py-0.5 font-bold">{ui('card.forced')}</span>}
                       </div>
-                      <div className="text-xs text-expense-ink font-medium mt-0.5">Personal loan @ 13.5% p.a., 3yr</div>
+                      <div className="text-xs text-expense-ink font-medium mt-0.5">{ui('card.personalLoanTerms')}</div>
                     </button>
                   )}
                 </div>

@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { buildInitialState, PRNG } from '@/engine';
 import { drawCardForTile, drawRandomCard, type Card } from '@/modules/cards/cards';
+import { tr, type Loc } from '@/i18n/loc';
+
+/** Resolve a localized field to a given language for assertions. */
+const EN = (l: Loc | undefined) => tr(l ?? '', 'en');
+const HI = (l: Loc | undefined) => tr(l ?? '', 'hi');
 
 const baseState = () =>
   buildInitialState({ seed: 7, playerName: 'T', age: 30, profession: 'sde', city: 'T1', family: 'single' });
@@ -86,20 +91,20 @@ describe('temptation realism: level 5 means "unavoidable", not "strong want"', (
 
   it('the unavoidable life events (medical / accident / new baby / pay cut) exist and are level 5', () => {
     const lifeSubtitles = ['medical emergency', 'accident', 'new baby', 'forced pay cut'];
-    const found = cards.filter((c) => lifeSubtitles.includes((c.subtitle ?? '').toLowerCase()));
+    const found = cards.filter((c) => lifeSubtitles.includes(EN(c.subtitle).toLowerCase()));
     expect(found.length).toBeGreaterThan(0);
     for (const c of found) expect(c.temptation).toBe(5);
   });
 
   it('life-event scenarios are concrete stories with a justified cost in the description', () => {
-    const stories = cards.filter((c) => ['medical emergency', 'accident', 'new baby'].includes((c.subtitle ?? '').toLowerCase()));
+    const stories = cards.filter((c) => ['medical emergency', 'accident', 'new baby'].includes(EN(c.subtitle).toLowerCase()));
     expect(stories.length).toBeGreaterThan(0);
     for (const c of stories) {
       // a real narrative, not "An unexpected ₹X expense"
-      expect(c.description.length).toBeGreaterThan(40);
+      expect(EN(c.description).length).toBeGreaterThan(40);
       // the rupee cost shown on the card matches the cost referenced in the story
-      const shown = c.rows?.find((r) => r.label === 'Cost')?.value ?? '';
-      expect(c.description).toContain(shown);
+      const shown = c.rows?.find((r) => EN(r.label) === 'Cost')?.value ?? '';
+      expect(EN(c.description)).toContain(shown);
     }
   });
 
@@ -108,7 +113,7 @@ describe('temptation realism: level 5 means "unavoidable", not "strong want"', (
     let downsizing: Card | undefined;
     for (let seed = 1; seed <= 4000 && !downsizing; seed++) {
       const c = drawCardForTile(s, new PRNG(seed), 'chance');
-      if ((c.subtitle ?? '').toLowerCase() === 'forced pay cut') downsizing = c;
+      if (EN(c.subtitle).toLowerCase() === 'forced pay cut') downsizing = c;
     }
     expect(downsizing).toBeDefined();
     const before = s.incomeStreams.find((i) => i.kind === 'salary')!.monthlyGross;
@@ -123,8 +128,8 @@ describe('every card reads like a real-life scene, not a spec line', () => {
 
   it('all cards carry a narrative description and a flavor reason', () => {
     for (const c of cards) {
-      expect(c.description.trim().length).toBeGreaterThanOrEqual(25);
-      expect(c.temptationReason.trim().length).toBeGreaterThanOrEqual(12);
+      expect(EN(c.description).trim().length).toBeGreaterThanOrEqual(25);
+      expect(EN(c.temptationReason).trim().length).toBeGreaterThanOrEqual(12);
     }
   });
 
@@ -139,7 +144,38 @@ describe('every card reads like a real-life scene, not a spec line', () => {
     ];
     const narrativeKinds = new Set(['deal_real_estate', 'deal_stock', 'deal_index_fund', 'deal_gold', 'deal_business', 'side_hustle', 'borrow_offer']);
     for (const c of cards.filter((x) => narrativeKinds.has(x.kind))) {
-      for (const phrase of stale) expect(c.description).not.toBe(phrase);
+      for (const phrase of stale) expect(EN(c.description)).not.toBe(phrase);
     }
+  });
+});
+
+describe('Hindi language mode', () => {
+  it('tr() falls back to English when a Hindi string is missing', () => {
+    expect(tr('plain', 'hi')).toBe('plain');               // plain strings are language-agnostic
+    expect(tr({ en: 'Buy', hi: 'खरीदें' }, 'hi')).toBe('खरीदें');
+    expect(tr({ en: 'Buy', hi: 'खरीदें' }, 'en')).toBe('Buy');
+    expect(tr({ en: 'Only English' }, 'hi')).toBe('Only English'); // graceful fallback
+  });
+
+  it('real-estate cards are actually localized (Hindi differs from English)', () => {
+    const s = baseState();
+    let re: Card | undefined;
+    for (let seed = 1; seed <= 200 && !re; seed++) {
+      const c = drawCardForTile(s, new PRNG(seed), 'deal');
+      if (c.kind === 'deal_real_estate') re = c;
+    }
+    expect(re).toBeDefined();
+    expect(HI(re!.description)).not.toBe(EN(re!.description));
+    expect(HI(re!.description).length).toBeGreaterThan(0);
+    // a localized option button, too
+    const opt = re!.options[0];
+    expect(HI(opt.label)).not.toBe(EN(opt.label));
+  });
+
+  it('UI strings resolve to Hindi', async () => {
+    const { t } = await import('@/i18n/strings');
+    expect(t('hud.cash', 'hi')).toBe('नकद');
+    expect(t('board.rollDice', 'hi')).toBe('पासा फेंकें');
+    expect(t('hud.cash', 'en')).toBe('Cash');
   });
 });
