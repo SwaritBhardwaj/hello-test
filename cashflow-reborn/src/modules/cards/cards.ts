@@ -432,7 +432,10 @@ function businessCard(state: GameState, rng: PRNG): Card {
 
 function doodadCard(state: GameState, rng: PRNG): Card {
   const doodads = [
-    { name: 'New iPhone Pro', cash: 1_50_000, monthly: 0, emoji: '📱', temptation: 5, reason: 'Your colleague pulled theirs out at lunch. Yours is suddenly embarrassing.' },
+    // NOTE: doodads are *wants*. However strong the marketing pull, you can always
+    // walk away — so they cap at temptation 4. Level 5 (the no-skip "unavoidable"
+    // tier) is reserved for genuine life emergencies (see lifeEventCard).
+    { name: 'New iPhone Pro', cash: 1_50_000, monthly: 0, emoji: '📱', temptation: 4, reason: 'Your colleague pulled theirs out at lunch. Yours is suddenly embarrassing.' },
     { name: 'Weekend in Goa', cash: 35_000, monthly: 0, emoji: '🏖️', temptation: 4, reason: 'You\'ve been working hard. You DESERVE this. (Do you?)' },
     { name: 'Smart TV upgrade', cash: 85_000, monthly: 0, emoji: '📺', temptation: 3, reason: 'The new one is OLED. The current one is fine, but… OLED.' },
     { name: 'Wardrobe refresh', cash: 25_000, monthly: 0, emoji: '👗', temptation: 3, reason: 'Festive sale. 70% off. Limited stock. (Always limited.)' },
@@ -440,9 +443,9 @@ function doodadCard(state: GameState, rng: PRNG): Card {
     { name: 'Streaming bundle', cash: 0, monthly: 1200, emoji: '🎬', temptation: 3, reason: 'It\'s ONLY ₹1200/mo. What\'s ₹1200/mo? (₹4.3L over 30 years.)' },
     { name: 'Fancy dining out', cash: 0, monthly: 6000, emoji: '🍽️', temptation: 4, reason: 'Date night, work dinners, weekend brunches. It\'s the lifestyle.' },
     { name: 'Designer handbag', cash: 65_000, monthly: 0, emoji: '👜', temptation: 4, reason: 'It\'s an investment. Bags hold value. (Spoiler: they mostly don\'t.)' },
-    { name: 'Two-wheeler upgrade', cash: 1_80_000, monthly: 0, emoji: '🛵', temptation: 5, reason: 'The salesperson just let you sit on it. Game over.' },
-    { name: 'Crypto plunge (memecoin)', cash: 40_000, monthly: 0, emoji: '🪙', temptation: 5, reason: 'A stranger on Twitter just 100x\'d. Your turn?' },
-    { name: 'New car (downpayment)', cash: 3_00_000, monthly: 0, emoji: '🚗', temptation: 5, reason: 'Your old car still works. But the new one has VENTILATED SEATS.' },
+    { name: 'Two-wheeler upgrade', cash: 1_80_000, monthly: 0, emoji: '🛵', temptation: 4, reason: 'The salesperson just let you sit on it. Game over.' },
+    { name: 'Crypto plunge (memecoin)', cash: 40_000, monthly: 0, emoji: '🪙', temptation: 4, reason: 'A stranger on Twitter just 100x\'d. Your turn?' },
+    { name: 'New car (downpayment)', cash: 3_00_000, monthly: 0, emoji: '🚗', temptation: 4, reason: 'Your old car still works. But the new one has VENTILATED SEATS.' },
   ];
   const pick = doodads[Math.floor(rng.next() * doodads.length)];
   const description = pick.monthly > 0
@@ -629,6 +632,119 @@ function unseenExpenseCard(state: GameState, rng: PRNG): Card {
   };
 }
 
+/**
+ * Genuine life emergencies — temptation 5 (truly unavoidable, no "skip").
+ * These are the events the player cannot resist: a new baby, a serious
+ * accident, a major medical event, or a forced pay cut in a downturn.
+ * Big, non-negotiable, and the whole point of an emergency fund.
+ */
+function lifeEventCard(state: GameState, rng: PRNG): Card {
+  const variant = rng.next();
+
+  // ---- Income downsizing: a forced salary cut, not an expense ----
+  if (variant < 0.25) {
+    const cutPct = 0.2 + rng.next() * 0.2; // 20–40% pay cut
+    const salary = state.incomeStreams.find((i) => i.kind === 'salary');
+    const oldSalary = salary?.monthlyGross ?? 0;
+    const newSalary = Math.round(oldSalary * (1 - cutPct));
+    const drop = oldSalary - newSalary;
+    return {
+      id: newId('card', state),
+      kind: 'market_event', // no spend decision → behaviorally a no-op for scoring
+      emoji: '📉',
+      title: 'Company downsizing',
+      subtitle: 'Forced pay cut',
+      description: `A market downturn hits your employer. Your salary is cut by ${Math.round(cutPct * 100)}%, effective immediately. There is no negotiation.`,
+      rows: [
+        { label: 'Old salary', value: `₹${oldSalary.toLocaleString('en-IN')}/mo` },
+        { label: 'New salary', value: `₹${newSalary.toLocaleString('en-IN')}/mo` },
+        { label: 'Monthly hit', value: `−₹${drop.toLocaleString('en-IN')}` },
+      ],
+      options: [
+        {
+          id: 'absorb',
+          label: 'You have no say in this',
+          apply: (s) => {
+            const sal = s.incomeStreams.find((i) => i.kind === 'salary');
+            if (sal) sal.monthlyGross = Math.round(sal.monthlyGross * (1 - cutPct));
+            return `Salary cut by ${Math.round(cutPct * 100)}%`;
+          },
+        },
+      ],
+      temptation: 5,
+      temptationReason: 'The market decides. Your budget doesn\'t get a vote.',
+      coachNote:
+        `Income shocks are why fixed costs (rent, EMIs) should stay well under your salary and why you keep ` +
+        `6 months of expenses liquid. A 30% pay cut should be survivable without fire-selling assets in a down market.`,
+    };
+  }
+
+  // ---- Catastrophic forced expenses: baby / accident / major medical ----
+  const events = [
+    { title: 'A baby is on the way', emoji: '👶', min: 150_000, max: 400_000, reason: 'A new life. Not a line item you get to negotiate.' },
+    { title: 'Serious accident', emoji: '🚑', min: 200_000, max: 700_000, reason: 'One moment changes everything. The bill does not wait.' },
+    { title: 'Major medical emergency', emoji: '🏥', min: 300_000, max: 1_200_000, reason: 'Health comes first. The cost is whatever it is.' },
+  ];
+  const pick = events[Math.floor(rng.next() * events.length)];
+  const cost = Math.round(pick.min + rng.next() * (pick.max - pick.min));
+
+  return {
+    id: newId('card', state),
+    kind: 'unseen_expense',
+    emoji: pick.emoji,
+    title: pick.title,
+    subtitle: 'Unavoidable',
+    description: `A non-negotiable ₹${cost.toLocaleString('en-IN')} expense. You cannot walk away — only choose how to pay.`,
+    rows: [{ label: 'Cost', value: `₹${cost.toLocaleString('en-IN')}` }],
+    options: [
+      {
+        id: 'pay',
+        label: 'Pay from cash',
+        cashCost: cost,
+        affordCheck: (s) => (s.cashOnHand < cost ? `Need ₹${cost.toLocaleString('en-IN')} — short by ₹${(cost - s.cashOnHand).toLocaleString('en-IN')}` : null),
+        apply: (s) => {
+          s.cashOnHand -= cost;
+          return `Paid ₹${cost.toLocaleString('en-IN')} for ${pick.title.toLowerCase()}`;
+        },
+        coachWarning: `Best case: your emergency fund absorbs this with zero interest. This is exactly what it's for.`,
+      },
+      {
+        id: 'personal',
+        label: 'Personal loan (13.5% p.a., 3yr)',
+        apply: (s) => {
+          const emi = pushLoan(s, {
+            kind: 'personal',
+            label: `Loan: ${pick.title}`,
+            principal: cost,
+            tenureMonths: 36,
+          });
+          return `Personal loan taken — EMI ₹${emi.toLocaleString('en-IN')}/mo`;
+        },
+        coachWarning: `Survivable if you must borrow. ~3x cheaper than a credit card. Total interest over 3yr ≈ ₹${Math.round(cost * 0.22).toLocaleString('en-IN')}.`,
+      },
+      {
+        id: 'cc',
+        label: 'Put on credit card (36% p.a.)',
+        apply: (s) => {
+          const emi = pushLoan(s, {
+            kind: 'credit_card',
+            label: `CC: ${pick.title}`,
+            principal: cost,
+            tenureMonths: 6,
+          });
+          return `On credit card @ 36% — EMI ₹${emi.toLocaleString('en-IN')}/mo`;
+        },
+        coachWarning: `WORST option. 36% p.a. is loanshark territory. This is how one emergency becomes years of debt.`,
+      },
+    ],
+    temptation: 5,
+    temptationReason: pick.reason,
+    coachNote:
+      `This is the scenario emergency funds and health/term insurance exist for. ₹6L liquid (6 months of expenses) ` +
+      `plus a ₹1Cr health floater (~₹15-25K/yr) turns a life-altering bill into a manageable one.`,
+  };
+}
+
 function borrowOfferCard(state: GameState, rng: PRNG): Card {
   const offers: Array<{ kind: LoanKind; label: string; principal: number; tenureMonths: number; emoji: string }> = [
     { kind: 'personal', label: 'Pre-approved personal loan', principal: 5 * lakh, tenureMonths: 36, emoji: '🏦' },
@@ -748,6 +864,7 @@ const GENERATORS: Array<{ weight: number; gen: (s: GameState, r: PRNG) => Card }
   { weight: 3, gen: doodadCard },
   { weight: 2, gen: sideHustleCard },
   { weight: 2, gen: unseenExpenseCard },
+  { weight: 1, gen: lifeEventCard },
   { weight: 1, gen: borrowOfferCard },
   { weight: 2, gen: marketEventCard },
   { weight: 1, gen: paydayBonusCard },
@@ -791,6 +908,7 @@ const TILE_POOLS: Record<TileType, Array<{ weight: number; gen: (s: GameState, r
   market: [{ weight: 1, gen: marketEventCard }],
   chance: [
     { weight: 2, gen: unseenExpenseCard },
+    { weight: 1, gen: lifeEventCard },
     { weight: 2, gen: sideHustleCard },
     { weight: 1, gen: borrowOfferCard },
     { weight: 1, gen: paydayBonusCard },

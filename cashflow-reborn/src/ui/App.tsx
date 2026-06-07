@@ -790,10 +790,11 @@ function CardModal({ card }: { card: Card }) {
         <div className={`px-5 py-2.5 border-b border-card-edge ${t >= 4 ? 'bg-expense-soft' : t >= 3 ? 'bg-caution-soft' : 'bg-card-edge'}`}>
           <div className="flex items-center justify-between">
             <div className="text-xs font-semibold uppercase tracking-wide text-ink font-display">
-              {t >= 5 ? 'You NEED this' : t >= 4 ? 'Very tempting' : t >= 3 ? 'Tempting' : t >= 2 ? 'Mildly interesting' : 'Take it or leave it'}
+              {t >= 5 ? 'Unavoidable' : t >= 4 ? 'Very tempting' : t >= 3 ? 'Tempting' : t >= 2 ? 'Mild pull' : 'Take it or leave it'}
             </div>
-            <div className="flex gap-0.5" aria-label={`Temptation ${t} of 5`}>
-              {[1, 2, 3, 4, 5].map((i) => <Coin key={i} size={i <= t ? 17 : 12} />)}
+            {/* Fixed-size meter: earned levels are solid coins, the rest hollow + desaturated slots */}
+            <div className="flex gap-1 items-center" aria-label={`Temptation ${t} of 5`}>
+              {[1, 2, 3, 4, 5].map((i) => <Coin key={i} size={16} empty={i > t} />)}
             </div>
           </div>
           <div className="text-sm italic text-ink mt-1 leading-snug">"{card.temptationReason}"</div>

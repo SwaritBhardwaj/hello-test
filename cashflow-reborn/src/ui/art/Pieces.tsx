@@ -1,7 +1,23 @@
 /** Custom SVG game pieces — coin, pawn, deck back. No emoji. */
 
-/** A brass ₹ coin. */
-export function Coin({ size = 22 }: { size?: number }) {
+/**
+ * A brass ₹ coin.
+ * `empty` renders a hollow, desaturated "slot to be filled" — used by rating
+ * meters (e.g. the temptation gauge) where earned coins are solid and the
+ * remaining ones are faint outlines.
+ */
+export function Coin({ size = 22, empty = false }: { size?: number; empty?: boolean }) {
+  if (empty) {
+    return (
+      <svg viewBox="0 0 24 24" width={size} height={size} role="img" aria-label="empty coin slot" className="inline-block align-middle shrink-0">
+        {/* desaturated, low-contrast hollow ring — clearly an unfilled slot */}
+        <circle cx="12" cy="12" r="11" fill="oklch(0.62 0.015 80 / 0.10)" stroke="oklch(0.55 0.02 80 / 0.45)" strokeWidth="1.5" />
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="oklch(0.55 0.02 80 / 0.25)" strokeWidth="0.8" />
+        <text x="12" y="16.5" textAnchor="middle" fontSize="12" fontWeight="700"
+          fill="oklch(0.55 0.015 80 / 0.35)" fontFamily="'Fredoka Variable', sans-serif">₹</text>
+      </svg>
+    );
+  }
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} role="img" aria-label="coin" className="inline-block align-middle shrink-0">
       <defs>
