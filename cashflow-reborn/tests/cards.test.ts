@@ -193,5 +193,10 @@ describe('Hindi language mode', () => {
     expect(t('hud.cash', 'hi')).toBe('नकद');
     expect(t('board.rollDice', 'hi')).toBe('पासा फेंकें');
     expect(t('hud.cash', 'en')).toBe('Cash');
+    // balance sheet
+    expect(t('bs.total', 'hi')).toBe('कुल');
+    expect(t('group.Equity', 'hi')).toBe('इक्विटी');
+    expect(t('loan.personal', 'hi', { r: '13.5' })).toBe('पर्सनल लोन (13.5%)');
+    expect(t('bs.payOff', 'hi', { x: '5,00,000' })).toBe('पूरा चुकाएँ (₹5,00,000)');
   });
 });

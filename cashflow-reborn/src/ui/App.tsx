@@ -935,6 +935,7 @@ function CardModal({ card }: { card: Card }) {
 // Inline finance panel inside the card modal
 // ============================================================
 function CardFinancePanel({ state, applyAction }: { state: ReturnType<typeof useGameStore.getState>['state']; applyAction: (a: import('@/types').DecisionAction) => void }) {
+  const { t } = useT();
   const [borrowTab, setBorrowTab] = useState(false);
   const [borrowLakhs, setBorrowLakhs] = useState(2);
   const [borrowMonths, setBorrowMonths] = useState(36);
@@ -956,15 +957,15 @@ function CardFinancePanel({ state, applyAction }: { state: ReturnType<typeof use
       {/* Summary row */}
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="rounded-lg bg-card p-2 ring-1 ring-card-edge">
-          <div className="text-2xs uppercase tracking-wide text-ink-soft font-semibold">Cash</div>
+          <div className="text-2xs uppercase tracking-wide text-ink-soft font-semibold">{t('hud.cash')}</div>
           <div className={`font-display font-bold tnum ${state.cashOnHand < 0 ? 'text-expense-ink' : 'text-income-ink'}`}>{formatINR(state.cashOnHand, { compact: true })}</div>
         </div>
         <div className="rounded-lg bg-card p-2 ring-1 ring-card-edge">
-          <div className="text-2xs uppercase tracking-wide text-ink-soft font-semibold">Net worth</div>
+          <div className="text-2xs uppercase tracking-wide text-ink-soft font-semibold">{t('hud.netWorth')}</div>
           <div className="font-display font-bold tnum text-ink">{formatINR(state.statement.netWorth, { compact: true })}</div>
         </div>
         <div className="rounded-lg bg-card p-2 ring-1 ring-card-edge">
-          <div className="text-2xs uppercase tracking-wide text-ink-soft font-semibold">Cashflow</div>
+          <div className="text-2xs uppercase tracking-wide text-ink-soft font-semibold">{t('hud.cashflow')}</div>
           <div className={`font-display font-bold tnum ${state.statement.totalIncome - state.statement.totalExpenses >= 0 ? 'text-income-ink' : 'text-expense-ink'}`}>
             {formatINR(state.statement.totalIncome - state.statement.totalExpenses, { compact: true })}/mo
           </div>
@@ -973,8 +974,8 @@ function CardFinancePanel({ state, applyAction }: { state: ReturnType<typeof use
 
       {/* Toggle: Assets / Borrow */}
       <div className="flex gap-1">
-        <button onClick={() => setBorrowTab(false)} className={`flex-1 rounded-lg py-1.5 font-display text-xs font-semibold transition ${!borrowTab ? 'bg-ink text-card' : 'bg-card-edge text-ink hover:bg-card'}`}>Assets &amp; Loans</button>
-        <button onClick={() => setBorrowTab(true)} className={`flex-1 rounded-lg py-1.5 font-display text-xs font-semibold transition ${borrowTab ? 'bg-ink text-card' : 'bg-card-edge text-ink hover:bg-card'}`}>Quick Borrow</button>
+        <button onClick={() => setBorrowTab(false)} className={`flex-1 rounded-lg py-1.5 font-display text-xs font-semibold transition ${!borrowTab ? 'bg-ink text-card' : 'bg-card-edge text-ink hover:bg-card'}`}>{t('fin.assetsLoans')}</button>
+        <button onClick={() => setBorrowTab(true)} className={`flex-1 rounded-lg py-1.5 font-display text-xs font-semibold transition ${borrowTab ? 'bg-ink text-card' : 'bg-card-edge text-ink hover:bg-card'}`}>{t('fin.quickBorrow')}</button>
       </div>
 
       {!borrowTab && (
@@ -982,7 +983,7 @@ function CardFinancePanel({ state, applyAction }: { state: ReturnType<typeof use
           {/* Assets — sell right here */}
           {topAssets.length > 0 && (
             <div>
-              <div className="text-2xs uppercase tracking-wide text-ink-soft font-bold mb-1">Assets</div>
+              <div className="text-2xs uppercase tracking-wide text-ink-soft font-bold mb-1">{t('fin.assets')}</div>
               {topAssets.map((a) => {
                 const val = a.currentPrice * a.units;
                 const gain = val - a.unitCost * a.units;
@@ -995,7 +996,7 @@ function CardFinancePanel({ state, applyAction }: { state: ReturnType<typeof use
                     <button
                       onClick={() => applyAction({ kind: 'sell_asset', assetId: a.id, units: a.units })}
                       className="btn-3d shrink-0 bg-expense-soft text-expense-ink text-xs px-2 py-1"
-                    >Sell all</button>
+                    >{t('fin.sellAll')}</button>
                   </div>
                 );
               })}
@@ -1004,7 +1005,7 @@ function CardFinancePanel({ state, applyAction }: { state: ReturnType<typeof use
           {/* Loans — prepay right here */}
           {topLoans.length > 0 && (
             <div>
-              <div className="text-2xs uppercase tracking-wide text-ink-soft font-bold mb-1">Loans</div>
+              <div className="text-2xs uppercase tracking-wide text-ink-soft font-bold mb-1">{t('fin.loans')}</div>
               {topLoans.map((l) => {
                 const canPay = Math.min(state.cashOnHand, l.principalOutstanding);
                 return (
@@ -1017,7 +1018,7 @@ function CardFinancePanel({ state, applyAction }: { state: ReturnType<typeof use
                       <button
                         onClick={() => applyAction({ kind: 'prepay_loan', loanId: l.id, amount: canPay })}
                         className="btn-3d shrink-0 bg-income-soft text-income-ink text-xs px-2 py-1"
-                      >Prepay</button>
+                      >{t('fin.prepay')}</button>
                     )}
                   </div>
                 );
@@ -1025,7 +1026,7 @@ function CardFinancePanel({ state, applyAction }: { state: ReturnType<typeof use
             </div>
           )}
           {topAssets.length === 0 && topLoans.length === 0 && (
-            <p className="text-ink-soft text-xs italic text-center py-2">No assets or loans yet.</p>
+            <p className="text-ink-soft text-xs italic text-center py-2">{t('fin.none')}</p>
           )}
         </div>
       )}
@@ -1033,24 +1034,24 @@ function CardFinancePanel({ state, applyAction }: { state: ReturnType<typeof use
       {borrowTab && (
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs text-ink-soft">
-            <span>Amount: <b className="text-ink tnum">₹{borrowLakhs}L</b></span>
-            <span>Tenure: <b className="text-ink tnum">{borrowMonths}mo</b></span>
+            <span>{t('fin.amount')}: <b className="text-ink tnum">₹{borrowLakhs}L</b></span>
+            <span>{t('fin.tenure')}: <b className="text-ink tnum">{borrowMonths}mo</b></span>
           </div>
           <input type="range" min={1} max={20} value={borrowLakhs} onChange={(e) => setBorrowLakhs(+e.target.value)} className="w-full accent-brass-600" />
           <input type="range" min={12} max={60} step={6} value={borrowMonths} onChange={(e) => setBorrowMonths(+e.target.value)} className="w-full accent-brass-600" />
           <div className="rounded-lg bg-card p-2 ring-1 ring-card-edge grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs tnum">
-            <span className="text-ink-soft">Rate</span><span className="text-ink font-semibold">13.5% p.a.</span>
-            <span className="text-ink-soft">EMI/mo</span><span className="text-income-ink font-bold">{formatINR(loan.emi)}</span>
-            <span className="text-ink-soft">Total interest</span><span className="text-expense-ink font-semibold">{formatINR(loan.emi * borrowMonths - borrowLakhs * 100_000)}</span>
-            <span className="text-ink-soft">You receive</span><span className="text-income-ink font-bold">{formatINR(borrowLakhs * 100_000)}</span>
+            <span className="text-ink-soft">{t('fin.rate')}</span><span className="text-ink font-semibold">13.5% p.a.</span>
+            <span className="text-ink-soft">{t('fin.emiMo')}</span><span className="text-income-ink font-bold">{formatINR(loan.emi)}</span>
+            <span className="text-ink-soft">{t('fin.totalInterest')}</span><span className="text-expense-ink font-semibold">{formatINR(loan.emi * borrowMonths - borrowLakhs * 100_000)}</span>
+            <span className="text-ink-soft">{t('fin.youReceive')}</span><span className="text-income-ink font-bold">{formatINR(borrowLakhs * 100_000)}</span>
           </div>
           <button
             onClick={() => { play('coin'); applyAction({ kind: 'take_loan', loan }); }}
             className="btn-3d w-full bg-brass-500 enabled:hover:bg-brass-600 text-wood-900 py-2 font-display"
           >
-            Borrow ₹{borrowLakhs}L — cash lands now
+            {t('fin.borrowNow', { x: borrowLakhs })}
           </button>
-          <p className="text-xs text-ink-soft text-center">Cash credits immediately. EMI auto-debits each month.</p>
+          <p className="text-xs text-ink-soft text-center">{t('fin.borrowNote')}</p>
         </div>
       )}
     </div>
@@ -1109,14 +1110,15 @@ function OutcomeModal({ status }: { status: 'won' | 'lost' }) {
 }
 
 function Scorecard({ score, unlockedCount }: { score: RunScore; unlockedCount: number }) {
+  const { t } = useT();
   const gradeColor = score.grade.startsWith('A') ? 'text-income-ink bg-income-soft' : score.grade === 'B' ? 'text-brass-600 bg-brass-100' : score.grade === 'C' ? 'text-caution-ink bg-caution-soft' : 'text-expense-ink bg-expense-soft';
   return (
     <div className="rounded-lg ring-1 ring-card-edge overflow-hidden">
       <div className="flex items-center gap-3 p-3 bg-card-edge/30">
         <div className={`w-14 h-14 rounded-xl grid place-items-center font-display text-2xl ${gradeColor}`}>{score.grade}</div>
         <div className="min-w-0">
-          <div className="font-display text-ink">Decision grade</div>
-          <div className="text-2xs text-ink-soft tnum">{score.goodMoves} smart · {score.badMoves} costly moves · {unlockedCount} achievements</div>
+          <div className="font-display text-ink">{t('outcome.grade')}</div>
+          <div className="text-2xs text-ink-soft tnum">{t('outcome.gradeSub', { good: score.goodMoves, bad: score.badMoves, ach: unlockedCount })}</div>
           <div className="mt-1 h-1.5 rounded-full bg-card-edge overflow-hidden w-40 max-w-full">
             <div className="h-full bg-income" style={{ width: `${score.decisionScore}%` }} />
           </div>
@@ -1135,14 +1137,15 @@ function ResultRow({ label, value, tone }: { label: string; value: string; tone?
 // Balance sheet (bottom sheet on mobile, side drawer on desktop)
 // ============================================================
 function BalanceSheet({ onClose }: { onClose: () => void }) {
+  const { t } = useT();
   const state = useGameStore((s) => s.state)!;
   const applyAction = useGameStore((s) => s.applyAction);
   const [tab, setTab] = useState<'statement' | 'assets' | 'liabilities' | 'borrow'>('statement');
   const tabs: { id: typeof tab; label: string }[] = [
-    { id: 'statement', label: 'Statement' },
-    { id: 'assets', label: `Assets (${state.assets.length})` },
-    { id: 'liabilities', label: `Loans (${state.liabilities.length})` },
-    { id: 'borrow', label: 'Borrow' },
+    { id: 'statement', label: t('bs.statement') },
+    { id: 'assets', label: t('bs.assetsN', { n: state.assets.length }) },
+    { id: 'liabilities', label: t('bs.loansN', { n: state.liabilities.length }) },
+    { id: 'borrow', label: t('bs.borrow') },
   ];
   return (
     <ModalShell labelledBy="sheet-title" onClose={onClose} align="end">
@@ -1154,10 +1157,10 @@ function BalanceSheet({ onClose }: { onClose: () => void }) {
       >
         <div className="sticky top-0 bg-wood-900 text-card px-5 py-3 flex justify-between items-center z-10">
           <div>
-            <div className="text-xs uppercase font-semibold tracking-wider text-card/80">Personal financial statement</div>
+            <div className="text-xs uppercase font-semibold tracking-wider text-card/80">{t('bs.title')}</div>
             <div id="sheet-title" className="font-display text-lg">{state.player.name}</div>
           </div>
-          <button onClick={onClose} className="text-2xl hover:bg-felt-700 w-9 h-9 rounded-lg" aria-label="Close">×</button>
+          <button onClick={onClose} className="text-2xl hover:bg-felt-700 w-9 h-9 rounded-lg" aria-label={t('bs.close')}>×</button>
         </div>
         <div className="sticky top-[60px] bg-card z-10 flex overflow-x-auto border-b border-card-edge">
           {tabs.map((tb) => (
@@ -1179,6 +1182,7 @@ function BalanceSheet({ onClose }: { onClose: () => void }) {
 }
 
 function StatementTab() {
+  const { t } = useT();
   const state = useGameStore((s) => s.state)!;
   const monthlySalary = state.incomeStreams.filter((i) => i.kind === 'salary').reduce((s, i) => s + i.monthlyGross, 0);
   const monthlyFreelance = state.incomeStreams.filter((i) => i.kind === 'freelance').reduce((s, i) => s + i.monthlyGross, 0);
@@ -1214,42 +1218,42 @@ function StatementTab() {
   return (
     <div className="space-y-4">
       <div className="bg-wood-900 text-card rounded-lg p-3 grid grid-cols-3 gap-2 text-center tnum">
-        <div><div className="text-xs uppercase tracking-wider font-semibold text-card/75">Net worth</div><div className="font-display text-lg">{formatINR(netWorth, { compact: true })}</div></div>
-        <div><div className="text-xs uppercase tracking-wider font-semibold text-card/75">Cashflow/mo</div><div className={`font-display text-lg ${cashflow >= 0 ? 'text-income' : 'text-expense'}`}>{cashflow >= 0 ? '+' : ''}{formatINR(cashflow, { compact: true })}</div></div>
-        <div><div className="text-xs uppercase tracking-wider font-semibold text-card/75">Passive/exp</div><div className={`font-display text-lg ${passiveCoverage >= 1 ? 'text-income' : 'text-brass-300'}`}>{(passiveCoverage * 100).toFixed(0)}%</div></div>
+        <div><div className="text-xs uppercase tracking-wider font-semibold text-card/75">{t('hud.netWorth')}</div><div className="font-display text-lg">{formatINR(netWorth, { compact: true })}</div></div>
+        <div><div className="text-xs uppercase tracking-wider font-semibold text-card/75">{t('bs.cashflowMo')}</div><div className={`font-display text-lg ${cashflow >= 0 ? 'text-income' : 'text-expense'}`}>{cashflow >= 0 ? '+' : ''}{formatINR(cashflow, { compact: true })}</div></div>
+        <div><div className="text-xs uppercase tracking-wider font-semibold text-card/75">{t('bs.passiveExp')}</div><div className={`font-display text-lg ${passiveCoverage >= 1 ? 'text-income' : 'text-brass-300'}`}>{(passiveCoverage * 100).toFixed(0)}%</div></div>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
-        <Quadrant title="INCOME" subtitle="Monthly" color="income" total={totalIncome}>
-          <LedgerRow label="Salary" value={monthlySalary} />
-          {monthlyFreelance > 0 && <LedgerRow label="Freelance / side hustle" value={monthlyFreelance} />}
-          <LedgerSubhead>Passive</LedgerSubhead>
-          {yieldByKind.rent > 0 && <LedgerRow label="Rental income" value={yieldByKind.rent} indent />}
-          {yieldByKind.dividend > 0 && <LedgerRow label="Dividends" value={yieldByKind.dividend} indent />}
-          {yieldByKind.interest > 0 && <LedgerRow label="Interest / yield" value={yieldByKind.interest} indent />}
-          {totalPassive === 0 && <LedgerRow label="(none yet)" value={0} indent muted />}
+        <Quadrant title={t('bs.income')} subtitle={t('bs.monthly')} color="income" total={totalIncome}>
+          <LedgerRow label={t('bs.salary')} value={monthlySalary} />
+          {monthlyFreelance > 0 && <LedgerRow label={t('bs.freelance')} value={monthlyFreelance} />}
+          <LedgerSubhead>{t('bs.passive')}</LedgerSubhead>
+          {yieldByKind.rent > 0 && <LedgerRow label={t('bs.rentalIncome')} value={yieldByKind.rent} indent />}
+          {yieldByKind.dividend > 0 && <LedgerRow label={t('bs.dividends')} value={yieldByKind.dividend} indent />}
+          {yieldByKind.interest > 0 && <LedgerRow label={t('bs.interestYield')} value={yieldByKind.interest} indent />}
+          {totalPassive === 0 && <LedgerRow label={t('bs.noneYet')} value={0} indent muted />}
         </Quadrant>
-        <Quadrant title="EXPENSES" subtitle="Monthly" color="expense" total={totalExpenses}>
+        <Quadrant title={t('bs.expenses')} subtitle={t('bs.monthly')} color="expense" total={totalExpenses}>
           {state.expenses.filter((e) => e.monthlyAmount > 0).map((e, i) => <LedgerRow key={i} label={prettyExpense(e.category, e.label)} value={e.monthlyAmount} />)}
-          {totalEMI > 0 && (<><LedgerSubhead>Loan EMIs</LedgerSubhead>{state.liabilities.map((l) => <LedgerRow key={l.id} label={l.label} value={l.emi} indent />)}</>)}
-          {totalPremium > 0 && (<><LedgerSubhead>Insurance</LedgerSubhead>{state.insurance.map((p) => <LedgerRow key={p.id} label={p.label} value={p.monthlyPremium} indent />)}</>)}
+          {totalEMI > 0 && (<><LedgerSubhead>{t('bs.loanEmis')}</LedgerSubhead>{state.liabilities.map((l) => <LedgerRow key={l.id} label={l.label} value={l.emi} indent />)}</>)}
+          {totalPremium > 0 && (<><LedgerSubhead>{t('bs.insurance')}</LedgerSubhead>{state.insurance.map((p) => <LedgerRow key={p.id} label={p.label} value={p.monthlyPremium} indent />)}</>)}
         </Quadrant>
       </div>
       <div className="grid sm:grid-cols-2 gap-3">
-        <Quadrant title="ASSETS" subtitle="Current value" color="brass" total={totalAssets}>
-          <LedgerRow label="Cash on hand" value={state.cashOnHand} />
+        <Quadrant title={t('bs.assetsCaps')} subtitle={t('bs.currentValue')} color="brass" total={totalAssets}>
+          <LedgerRow label={t('bs.cashOnHand')} value={state.cashOnHand} />
           {Object.entries(assetGroups).map(([group, items]) => {
             const groupTotal = items.reduce((s, x) => s + x.value, 0);
             return (
               <div key={group}>
-                <LedgerSubhead>{group} <span className="text-ink-faint font-normal">({formatINR(groupTotal, { compact: true })})</span></LedgerSubhead>
+                <LedgerSubhead>{t(`group.${group}` as 'group.Other')} <span className="text-ink-faint font-normal">({formatINR(groupTotal, { compact: true })})</span></LedgerSubhead>
                 {items.map((x, i) => <LedgerRow key={i} label={x.label} value={x.value} indent />)}
               </div>
             );
           })}
-          {Object.keys(assetGroups).length === 0 && <LedgerRow label="(no investments yet — draw deal cards)" value={0} muted />}
+          {Object.keys(assetGroups).length === 0 && <LedgerRow label={t('bs.noInvest')} value={0} muted />}
         </Quadrant>
-        <Quadrant title="LIABILITIES" subtitle="Outstanding" color="expense" total={totalLiab}>
-          {state.liabilities.length === 0 && <LedgerRow label="Debt-free ★" value={0} muted />}
+        <Quadrant title={t('bs.liabilities')} subtitle={t('bs.outstanding')} color="expense" total={totalLiab}>
+          {state.liabilities.length === 0 && <LedgerRow label={t('bs.debtFree')} value={0} muted />}
           {state.liabilities.map((l) => (
             <div key={l.id}>
               <LedgerRow label={l.label} value={l.principalOutstanding} />
@@ -1259,7 +1263,7 @@ function StatementTab() {
         </Quadrant>
       </div>
       <div className="bg-card-edge/40 rounded-lg p-3 text-center text-sm font-mono tnum">
-        <div className="text-ink-faint text-2xs">Assets − Liabilities = Net worth</div>
+        <div className="text-ink-faint text-2xs">{t('bs.equation')}</div>
         <div className="font-bold text-ink mt-1">
           {formatINR(totalAssets, { compact: true })} − {formatINR(totalLiab, { compact: true })} = <span className={netWorth >= 0 ? 'text-income-ink' : 'text-expense-ink'}>{formatINR(netWorth, { compact: true })}</span>
         </div>
@@ -1284,13 +1288,14 @@ function prettyExpense(category: string, label: string): string {
 }
 
 function Quadrant({ title, subtitle, color, total, children }: { title: string; subtitle: string; color: 'income' | 'expense' | 'brass'; total: number; children: React.ReactNode }) {
+  const { t } = useT();
   const head = color === 'income' ? 'bg-income text-card' : color === 'expense' ? 'bg-expense text-card' : 'bg-brass-600 text-wood-900';
   const totalText = color === 'income' ? 'text-income-ink' : color === 'expense' ? 'text-expense-ink' : 'text-wood-700';
   return (
     <div className="bg-card border border-card-edge rounded-lg overflow-hidden shadow-card">
       <div className={`${head} px-3 py-1.5 flex items-baseline justify-between`}><span className="font-display text-sm tracking-wide">{title}</span><span className="text-2xs uppercase tracking-wider opacity-80">{subtitle}</span></div>
       <div className="p-3 space-y-0.5 text-sm">{children}</div>
-      <div className={`px-3 py-2 border-t-2 border-card-edge flex justify-between font-bold text-sm bg-card-edge/40 ${totalText}`}><span>TOTAL</span><span className="font-mono tnum">{formatINR(total)}</span></div>
+      <div className={`px-3 py-2 border-t-2 border-card-edge flex justify-between font-bold text-sm bg-card-edge/40 ${totalText}`}><span>{t('bs.total')}</span><span className="font-mono tnum">{formatINR(total)}</span></div>
     </div>
   );
 }
@@ -1308,11 +1313,12 @@ function LedgerSubhead({ children }: { children: React.ReactNode }) {
 }
 
 function AssetsTab({ onSell }: { onSell: (a: Asset, units: number) => void }) {
+  const { t } = useT();
   const state = useGameStore((s) => s.state)!;
   if (state.assets.length === 0) {
     return (
       <div className="text-center py-10 text-ink-faint">
-        <Coin size={36} /><p className="mt-2 text-sm">No assets yet.<br />Draw a deal card and invest.</p>
+        <Coin size={36} /><p className="mt-2 text-sm">{t('bs.noAssets')}<br />{t('bs.drawDeal')}</p>
       </div>
     );
   }
@@ -1334,8 +1340,8 @@ function AssetsTab({ onSell }: { onSell: (a: Asset, units: number) => void }) {
             </div>
             <div className="text-2xs text-ink-soft mt-1 tnum">{a.units} units @ ₹{a.currentPrice.toLocaleString('en-IN')} · Yield ₹{Math.round(monthlyYield).toLocaleString('en-IN')}/mo</div>
             <div className="flex gap-2 mt-2">
-              <button onClick={() => { play('coin'); onSell(a, a.units); }} className="text-2xs bg-expense-soft hover:bg-expense/20 text-expense-ink px-3 py-1 rounded font-display">Sell all</button>
-              {a.units > 1 && <button onClick={() => { play('coin'); onSell(a, Math.floor(a.units / 2)); }} className="text-2xs bg-caution-soft hover:bg-caution/20 text-caution-ink px-3 py-1 rounded font-display">Sell half</button>}
+              <button onClick={() => { play('coin'); onSell(a, a.units); }} className="text-2xs bg-expense-soft hover:bg-expense/20 text-expense-ink px-3 py-1 rounded font-display">{t('fin.sellAll')}</button>
+              {a.units > 1 && <button onClick={() => { play('coin'); onSell(a, Math.floor(a.units / 2)); }} className="text-2xs bg-caution-soft hover:bg-caution/20 text-caution-ink px-3 py-1 rounded font-display">{t('fin.sellHalf')}</button>}
             </div>
           </div>
         );
@@ -1345,8 +1351,9 @@ function AssetsTab({ onSell }: { onSell: (a: Asset, units: number) => void }) {
 }
 
 function LiabilitiesTab({ onPrepay }: { onPrepay: (l: Loan, amount: number) => void }) {
+  const { t } = useT();
   const state = useGameStore((s) => s.state)!;
-  if (state.liabilities.length === 0) return <div className="text-center py-10 text-ink-faint"><div className="text-3xl">★</div><p className="mt-2 text-sm">Debt-free.</p></div>;
+  if (state.liabilities.length === 0) return <div className="text-center py-10 text-ink-faint"><div className="text-3xl">★</div><p className="mt-2 text-sm">{t('bs.debtFreeShort')}</p></div>;
   return (
     <div className="space-y-3">
       {state.liabilities.map((l) => {
@@ -1359,9 +1366,9 @@ function LiabilitiesTab({ onPrepay }: { onPrepay: (l: Loan, amount: number) => v
               <div className="text-right tnum"><div className="font-bold text-expense-ink">{formatINR(l.principalOutstanding, { compact: true })}</div><div className="text-2xs text-ink-faint">EMI ₹{l.emi.toLocaleString('en-IN')} · {l.remainingMonths}mo</div></div>
             </div>
             <div className="flex gap-2 mt-2 flex-wrap">
-              {full > 0 && <button onClick={() => { play('coin'); onPrepay(l, full); }} disabled={state.cashOnHand < full} className="text-2xs bg-income-soft hover:bg-income/20 text-income-ink px-3 py-1 rounded font-display disabled:opacity-50">Pay off (₹{full.toLocaleString('en-IN')})</button>}
-              {half > 0 && half < l.principalOutstanding && <button onClick={() => { play('coin'); onPrepay(l, half); }} disabled={state.cashOnHand < half} className="text-2xs bg-caution-soft hover:bg-caution/20 text-caution-ink px-3 py-1 rounded font-display disabled:opacity-50">Prepay half (₹{half.toLocaleString('en-IN')})</button>}
-              {l.prepaymentPenalty > 0 && <div className="text-2xs text-ink-faint ml-auto self-center">Penalty: {(l.prepaymentPenalty * 100).toFixed(1)}%</div>}
+              {full > 0 && <button onClick={() => { play('coin'); onPrepay(l, full); }} disabled={state.cashOnHand < full} className="text-2xs bg-income-soft hover:bg-income/20 text-income-ink px-3 py-1 rounded font-display disabled:opacity-50">{t('bs.payOff', { x: full.toLocaleString('en-IN') })}</button>}
+              {half > 0 && half < l.principalOutstanding && <button onClick={() => { play('coin'); onPrepay(l, half); }} disabled={state.cashOnHand < half} className="text-2xs bg-caution-soft hover:bg-caution/20 text-caution-ink px-3 py-1 rounded font-display disabled:opacity-50">{t('bs.prepayHalf', { x: half.toLocaleString('en-IN') })}</button>}
+              {l.prepaymentPenalty > 0 && <div className="text-2xs text-ink-faint ml-auto self-center">{t('bs.penalty', { x: (l.prepaymentPenalty * 100).toFixed(1) })}</div>}
             </div>
           </div>
         );
@@ -1371,6 +1378,7 @@ function LiabilitiesTab({ onPrepay }: { onPrepay: (l: Loan, amount: number) => v
 }
 
 function BorrowTab() {
+  const { t } = useT();
   const applyAction = useGameStore((s) => s.applyAction);
   const [kind, setKind] = useState<LoanKind>('personal');
   const [principalLakhs, setPrincipalLakhs] = useState(5);
@@ -1380,30 +1388,30 @@ function BorrowTab() {
   const loan = buildLoan({ kind, label: `${kind} loan`, principal, tenureMonths });
   return (
     <div className="space-y-4">
-      <p className="text-sm text-ink-soft">Take a loan directly. Cash credits immediately; EMIs auto-debit each month.</p>
+      <p className="text-sm text-ink-soft">{t('bs.borrowIntro')}</p>
       <div className="bg-card-edge/30 rounded-lg p-4 space-y-3">
-        <Field label="Loan type">
+        <Field label={t('bs.loanType')}>
           <Select value={kind} onChange={(v) => setKind(v as LoanKind)}>
-            <option value="personal">Personal loan ({(LOAN_RATES.personal.rate * 100).toFixed(1)}%)</option>
-            <option value="car">Car loan ({(LOAN_RATES.car.rate * 100).toFixed(1)}%)</option>
-            <option value="education">Education loan ({(LOAN_RATES.education.rate * 100).toFixed(1)}%)</option>
-            <option value="business">Business loan ({(LOAN_RATES.business.rate * 100).toFixed(1)}%)</option>
-            <option value="credit_card">Credit card revolve ({(LOAN_RATES.credit_card.rate * 100).toFixed(1)}%)</option>
+            <option value="personal">{t('loan.personal', { r: (LOAN_RATES.personal.rate * 100).toFixed(1) })}</option>
+            <option value="car">{t('loan.car', { r: (LOAN_RATES.car.rate * 100).toFixed(1) })}</option>
+            <option value="education">{t('loan.education', { r: (LOAN_RATES.education.rate * 100).toFixed(1) })}</option>
+            <option value="business">{t('loan.business', { r: (LOAN_RATES.business.rate * 100).toFixed(1) })}</option>
+            <option value="credit_card">{t('loan.credit_card', { r: (LOAN_RATES.credit_card.rate * 100).toFixed(1) })}</option>
           </Select>
         </Field>
-        <Field label={`Principal (₹${principalLakhs} lakh)`}>
+        <Field label={t('bs.principalLakh', { x: principalLakhs })}>
           <input type="range" min={1} max={50} value={principalLakhs} onChange={(e) => setPrincipalLakhs(+e.target.value)} className="w-full accent-brass-600" />
         </Field>
-        <Field label={`Tenure (${tenureMonths} months ≈ ${(tenureMonths / 12).toFixed(1)} years)`}>
+        <Field label={t('bs.tenureMonths', { m: tenureMonths, y: (tenureMonths / 12).toFixed(1) })}>
           <input type="range" min={6} max={LOAN_RATES[kind].maxTenureMonths} value={Math.min(tenureMonths, LOAN_RATES[kind].maxTenureMonths)} onChange={(e) => setTenureMonths(+e.target.value)} className="w-full accent-brass-600" />
         </Field>
         <div className="bg-card rounded p-3 text-sm space-y-1 tnum">
-          <Row label="Rate" value={`${(rate * 100).toFixed(2)}% p.a.`} />
-          <Row label="EMI" value={formatINR(loan.emi) + '/mo'} />
-          <Row label="Total interest" value={formatINR(loan.emi * tenureMonths - principal)} />
-          <Row label="Principal received" value={formatINR(principal)} bold />
+          <Row label={t('fin.rate')} value={`${(rate * 100).toFixed(2)}% p.a.`} />
+          <Row label={t('bs.emiRow')} value={formatINR(loan.emi) + '/mo'} />
+          <Row label={t('fin.totalInterest')} value={formatINR(loan.emi * tenureMonths - principal)} />
+          <Row label={t('bs.principalReceived')} value={formatINR(principal)} bold />
         </div>
-        <PrimaryButton onClick={() => { play('coin'); applyAction({ kind: 'take_loan', loan }); }} className="w-full">Take this loan</PrimaryButton>
+        <PrimaryButton onClick={() => { play('coin'); applyAction({ kind: 'take_loan', loan }); }} className="w-full">{t('bs.takeLoan')}</PrimaryButton>
       </div>
     </div>
   );
