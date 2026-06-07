@@ -172,6 +172,22 @@ describe('Hindi language mode', () => {
     expect(HI(opt.label)).not.toBe(EN(opt.label));
   });
 
+  it('every card kind has a localized Hindi description (no English left in Hindi mode)', () => {
+    const cards = sampleCards();
+    const byKind = new Map<string, Card>();
+    for (const c of cards) if (!byKind.has(c.kind)) byKind.set(c.kind, c);
+    // we should have seen all 11 kinds
+    expect(byKind.size).toBeGreaterThanOrEqual(10);
+    for (const [kind, c] of byKind) {
+      const en = EN(c.description);
+      const hi = HI(c.description);
+      expect(hi.length, `${kind} has empty Hindi`).toBeGreaterThan(0);
+      expect(hi, `${kind} description not translated`).not.toBe(en);
+      // titles + temptation reason localized too
+      expect(HI(c.temptationReason)).not.toBe('');
+    }
+  });
+
   it('UI strings resolve to Hindi', async () => {
     const { t } = await import('@/i18n/strings');
     expect(t('hud.cash', 'hi')).toBe('नकद');
