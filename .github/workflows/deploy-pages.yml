@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - claude/create-new-project-92qfF
   workflow_dispatch:
 
 permissions:
