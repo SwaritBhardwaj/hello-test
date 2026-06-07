@@ -84,24 +84,62 @@ describe('temptation realism: level 5 means "unavoidable", not "strong want"', (
     }
   });
 
-  it('the unavoidable life events (baby / accident / medical / downsizing) exist and are level 5', () => {
-    const lifeTitles = ['baby', 'accident', 'medical', 'downsizing'];
-    const found = cards.filter((c) => lifeTitles.some((t) => c.title.toLowerCase().includes(t)));
+  it('the unavoidable life events (medical / accident / new baby / pay cut) exist and are level 5', () => {
+    const lifeSubtitles = ['medical emergency', 'accident', 'new baby', 'forced pay cut'];
+    const found = cards.filter((c) => lifeSubtitles.includes((c.subtitle ?? '').toLowerCase()));
     expect(found.length).toBeGreaterThan(0);
     for (const c of found) expect(c.temptation).toBe(5);
+  });
+
+  it('life-event scenarios are concrete stories with a justified cost in the description', () => {
+    const stories = cards.filter((c) => ['medical emergency', 'accident', 'new baby'].includes((c.subtitle ?? '').toLowerCase()));
+    expect(stories.length).toBeGreaterThan(0);
+    for (const c of stories) {
+      // a real narrative, not "An unexpected ₹X expense"
+      expect(c.description.length).toBeGreaterThan(40);
+      // the rupee cost shown on the card matches the cost referenced in the story
+      const shown = c.rows?.find((r) => r.label === 'Cost')?.value ?? '';
+      expect(c.description).toContain(shown);
+    }
   });
 
   it('downsizing actually cuts salary income', () => {
     const s = baseState();
     let downsizing: Card | undefined;
-    for (let seed = 1; seed <= 2000 && !downsizing; seed++) {
+    for (let seed = 1; seed <= 4000 && !downsizing; seed++) {
       const c = drawCardForTile(s, new PRNG(seed), 'chance');
-      if (c.title.toLowerCase().includes('downsizing')) downsizing = c;
+      if ((c.subtitle ?? '').toLowerCase() === 'forced pay cut') downsizing = c;
     }
     expect(downsizing).toBeDefined();
     const before = s.incomeStreams.find((i) => i.kind === 'salary')!.monthlyGross;
     downsizing!.options[0].apply(s);
     const after = s.incomeStreams.find((i) => i.kind === 'salary')!.monthlyGross;
     expect(after).toBeLessThan(before);
+  });
+});
+
+describe('every card reads like a real-life scene, not a spec line', () => {
+  const cards = sampleCards();
+
+  it('all cards carry a narrative description and a flavor reason', () => {
+    for (const c of cards) {
+      expect(c.description.trim().length).toBeGreaterThanOrEqual(25);
+      expect(c.temptationReason.trim().length).toBeGreaterThanOrEqual(12);
+    }
+  });
+
+  it('deal / side-hustle / borrow cards are no longer the old generic blurbs', () => {
+    const stale = [
+      'A flat is on the market',
+      'Equity in',
+      'Diversified equity exposure. Lower variance than individual stocks.',
+      'Government-backed gold bond. 2.5% nominal interest + price appreciation.',
+      'Side business opportunity. Illiquid; treat as long-term commitment.',
+      'Borrowed money is real money — and so is the EMI.',
+    ];
+    const narrativeKinds = new Set(['deal_real_estate', 'deal_stock', 'deal_index_fund', 'deal_gold', 'deal_business', 'side_hustle', 'borrow_offer']);
+    for (const c of cards.filter((x) => narrativeKinds.has(x.kind))) {
+      for (const phrase of stale) expect(c.description).not.toBe(phrase);
+    }
   });
 });
