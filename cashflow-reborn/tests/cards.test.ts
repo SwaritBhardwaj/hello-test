@@ -84,19 +84,31 @@ describe('temptation realism: level 5 means "unavoidable", not "strong want"', (
     }
   });
 
-  it('the unavoidable life events (baby / accident / medical / downsizing) exist and are level 5', () => {
-    const lifeTitles = ['baby', 'accident', 'medical', 'downsizing'];
-    const found = cards.filter((c) => lifeTitles.some((t) => c.title.toLowerCase().includes(t)));
+  it('the unavoidable life events (medical / accident / new baby / pay cut) exist and are level 5', () => {
+    const lifeSubtitles = ['medical emergency', 'accident', 'new baby', 'forced pay cut'];
+    const found = cards.filter((c) => lifeSubtitles.includes((c.subtitle ?? '').toLowerCase()));
     expect(found.length).toBeGreaterThan(0);
     for (const c of found) expect(c.temptation).toBe(5);
+  });
+
+  it('life-event scenarios are concrete stories with a justified cost in the description', () => {
+    const stories = cards.filter((c) => ['medical emergency', 'accident', 'new baby'].includes((c.subtitle ?? '').toLowerCase()));
+    expect(stories.length).toBeGreaterThan(0);
+    for (const c of stories) {
+      // a real narrative, not "An unexpected ₹X expense"
+      expect(c.description.length).toBeGreaterThan(40);
+      // the rupee cost shown on the card matches the cost referenced in the story
+      const shown = c.rows?.find((r) => r.label === 'Cost')?.value ?? '';
+      expect(c.description).toContain(shown);
+    }
   });
 
   it('downsizing actually cuts salary income', () => {
     const s = baseState();
     let downsizing: Card | undefined;
-    for (let seed = 1; seed <= 2000 && !downsizing; seed++) {
+    for (let seed = 1; seed <= 4000 && !downsizing; seed++) {
       const c = drawCardForTile(s, new PRNG(seed), 'chance');
-      if (c.title.toLowerCase().includes('downsizing')) downsizing = c;
+      if ((c.subtitle ?? '').toLowerCase() === 'forced pay cut') downsizing = c;
     }
     expect(downsizing).toBeDefined();
     const before = s.incomeStreams.find((i) => i.kind === 'salary')!.monthlyGross;

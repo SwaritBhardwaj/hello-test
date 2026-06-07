@@ -561,14 +561,29 @@ function sideHustleCard(state: GameState, rng: PRNG): Card {
 }
 
 function unseenExpenseCard(state: GameState, rng: PRNG): Card {
+  // Each is a concrete, imaginable scenario; the cost fits the specific story.
   const items = [
-    { name: 'Car breakdown', cost: 22_000, emoji: '🔧' },
-    { name: 'Laptop died', cost: 95_000, emoji: '💻' },
-    { name: 'Family wedding contribution', cost: 75_000, emoji: '💒' },
-    { name: 'Parents need help', cost: 40_000, emoji: '👨‍👩‍👧' },
-    { name: 'Home repair (leak)', cost: 28_000, emoji: '🚰' },
-    { name: 'Dental work', cost: 35_000, emoji: '🦷' },
-    { name: 'Speeding ticket', cost: 5_000, emoji: '🚓' },
+    { name: 'Car won\'t start', cost: 22_000, emoji: '🔧',
+      story: 'Monday morning, dead in the driveway. The mechanic diagnoses the clutch assembly — ₹22,000 and two days in the garage.',
+      reason: 'No car, no commute. It has to be fixed.' },
+    { name: 'Laptop won\'t boot', cost: 95_000, emoji: '💻',
+      story: 'The screen flickers once and dies mid-deadline. The motherboard is fried; a replacement is ₹95,000.',
+      reason: 'Your work lives on it. No laptop, no income.' },
+    { name: 'Cousin\'s wedding', cost: 75_000, emoji: '💒',
+      story: 'The whole family is going. Your share of the gift, outfits, and travel comes to ₹75,000. Saying no isn\'t really an option.',
+      reason: 'Family. You already RSVP\'d in your heart.' },
+    { name: 'Parents need help', cost: 40_000, emoji: '👨‍👩‍👧',
+      story: 'Dad\'s pension fell short and the house back home needs urgent repairs. They\'d never ask — which is exactly why you send ₹40,000.',
+      reason: 'They raised you. This isn\'t a question.' },
+    { name: 'Burst water pipe', cost: 28_000, emoji: '🚰',
+      story: 'A pipe gives way behind the bathroom wall at midnight. Plumber, re-tiling, and a ruined cupboard: ₹28,000.',
+      reason: 'The water won\'t stop until you pay someone to stop it.' },
+    { name: 'Root canal', cost: 35_000, emoji: '🦷',
+      story: 'A molar that\'s been "fine" finally isn\'t. Root canal plus a crown: ₹35,000.',
+      reason: 'The pain decides for you.' },
+    { name: 'Traffic challan', cost: 5_000, emoji: '🚓',
+      story: 'Clocked at 78 in a 50 zone by an AI camera. The challan lands on your phone before you\'re even home: ₹5,000.',
+      reason: 'The camera already has your number plate.' },
   ];
   const pick = items[Math.floor(rng.next() * items.length)];
   return {
@@ -577,7 +592,7 @@ function unseenExpenseCard(state: GameState, rng: PRNG): Card {
     emoji: pick.emoji,
     title: pick.name,
     subtitle: 'Unforeseen',
-    description: `An unexpected ₹${pick.cost.toLocaleString('en-IN')} expense.`,
+    description: pick.story,
     rows: [{ label: 'Cost', value: `₹${pick.cost.toLocaleString('en-IN')}` }],
     options: [
       {
@@ -625,7 +640,7 @@ function unseenExpenseCard(state: GameState, rng: PRNG): Card {
       },
     ],
     temptation: 5,
-    temptationReason: 'Not optional. Life doesn\'t ask permission.',
+    temptationReason: pick.reason,
     coachNote:
       `Why emergency funds exist. Rule of thumb: 6 months of expenses parked in a liquid fund / savings (3-7% yield). ` +
       `Without one, you pay 36% on credit cards instead of earning 12% on equity — a 48-point swing on every rupee.`,
@@ -634,16 +649,27 @@ function unseenExpenseCard(state: GameState, rng: PRNG): Card {
 
 /**
  * Genuine life emergencies — temptation 5 (truly unavoidable, no "skip").
- * These are the events the player cannot resist: a new baby, a serious
- * accident, a major medical event, or a forced pay cut in a downturn.
+ * Every one is a specific, imaginable story, and the price tag fits that exact
+ * scenario (a heart attack costs what a heart attack costs — no random ranges).
+ * A new baby, a serious accident, a major medical event, or a forced pay cut.
  * Big, non-negotiable, and the whole point of an emergency fund.
  */
 function lifeEventCard(state: GameState, rng: PRNG): Card {
-  const variant = rng.next();
-
-  // ---- Income downsizing: a forced salary cut, not an expense ----
-  if (variant < 0.25) {
-    const cutPct = 0.2 + rng.next() * 0.2; // 20–40% pay cut
+  // ---- Income downsizing: a forced salary cut, not an expense (~25% of draws) ----
+  if (rng.next() < 0.25) {
+    const downsizings = [
+      { emoji: '❄️', title: 'Funding winter', cut: 0.30,
+        story: (p: number) => `Your startup\'s next round falls through. To stretch the runway, every salary is cut ${p}% — yours included, effective this month.`,
+        reason: 'Survive now; the equity dream waits.' },
+      { emoji: '🤖', title: 'Restructured out of your role', cut: 0.25,
+        story: (p: number) => `Half your team\'s work just got automated. HR offers you a "lateral move" — same desk, ${p}% less pay. The alternative is the door.`,
+        reason: 'The org chart shrank. So did your CTC.' },
+      { emoji: '📉', title: 'Recession cost-cutting', cut: 0.20,
+        story: (p: number) => `Third quarter missed in a row. Variable pay is frozen and base takes a ${p}% haircut across the company.`,
+        reason: 'The market decides. Your budget gets no vote.' },
+    ];
+    const d = downsizings[Math.floor(rng.next() * downsizings.length)];
+    const cutPct = d.cut;
     const salary = state.incomeStreams.find((i) => i.kind === 'salary');
     const oldSalary = salary?.monthlyGross ?? 0;
     const newSalary = Math.round(oldSalary * (1 - cutPct));
@@ -651,10 +677,10 @@ function lifeEventCard(state: GameState, rng: PRNG): Card {
     return {
       id: newId('card', state),
       kind: 'market_event', // no spend decision → behaviorally a no-op for scoring
-      emoji: '📉',
-      title: 'Company downsizing',
+      emoji: d.emoji,
+      title: d.title,
       subtitle: 'Forced pay cut',
-      description: `A market downturn hits your employer. Your salary is cut by ${Math.round(cutPct * 100)}%, effective immediately. There is no negotiation.`,
+      description: d.story(Math.round(cutPct * 100)),
       rows: [
         { label: 'Old salary', value: `₹${oldSalary.toLocaleString('en-IN')}/mo` },
         { label: 'New salary', value: `₹${newSalary.toLocaleString('en-IN')}/mo` },
@@ -672,29 +698,59 @@ function lifeEventCard(state: GameState, rng: PRNG): Card {
         },
       ],
       temptation: 5,
-      temptationReason: 'The market decides. Your budget doesn\'t get a vote.',
+      temptationReason: d.reason,
       coachNote:
         `Income shocks are why fixed costs (rent, EMIs) should stay well under your salary and why you keep ` +
-        `6 months of expenses liquid. A 30% pay cut should be survivable without fire-selling assets in a down market.`,
+        `6 months of expenses liquid. A ${Math.round(cutPct * 100)}% pay cut should be survivable without fire-selling assets in a down market.`,
     };
   }
 
-  // ---- Catastrophic forced expenses: baby / accident / major medical ----
-  const events = [
-    { title: 'A baby is on the way', emoji: '👶', min: 150_000, max: 400_000, reason: 'A new life. Not a line item you get to negotiate.' },
-    { title: 'Serious accident', emoji: '🚑', min: 200_000, max: 700_000, reason: 'One moment changes everything. The bill does not wait.' },
-    { title: 'Major medical emergency', emoji: '🏥', min: 300_000, max: 1_200_000, reason: 'Health comes first. The cost is whatever it is.' },
+  // ---- Catastrophic forced expenses: each story carries its own justified cost ----
+  const scenarios = [
+    // Medical
+    { subtitle: 'Medical emergency', emoji: '🫀', title: 'Dad collapses at home', cost: 4_50_000,
+      story: 'A heart attack. The cardiac unit won\'t wheel him in until ₹4,50,000 for the angioplasty and two stents is cleared.',
+      reason: 'It\'s your father. You pay, and you pay now.' },
+    { subtitle: 'Medical emergency', emoji: '🏥', title: 'Appendix bursts at 2 a.m.', cost: 1_75_000,
+      story: 'Emergency appendectomy and four nights admitted. The bill at discharge: ₹1,75,000.',
+      reason: 'Surgery tonight, not next payday.' },
+    { subtitle: 'Medical emergency', emoji: '🦵', title: 'Mom\'s knee can\'t wait', cost: 3_20_000,
+      story: 'The orthopaedic surgeon says one more monsoon and she won\'t walk. Knee replacement plus an imported implant: ₹3,20,000.',
+      reason: 'She carried you. Now it\'s your turn.' },
+    { subtitle: 'Medical emergency', emoji: '🩸', title: 'Dengue turns serious', cost: 2_40_000,
+      story: 'Platelets crash overnight. Six days in the ICU with transfusions and round-the-clock monitoring: ₹2,40,000.',
+      reason: 'The ICU doesn\'t take EMIs at the door.' },
+    // Accident
+    { subtitle: 'Accident', emoji: '🏍️', title: 'Bike skid on a wet road', cost: 2_80_000,
+      story: 'A fractured tibia. Surgery to insert a titanium rod, plus eight weeks of physiotherapy: ₹2,80,000.',
+      reason: 'You\'re on the operating table either way.' },
+    { subtitle: 'Accident', emoji: '🚗', title: 'Highway pile-up', cost: 3_60_000,
+      story: 'You walk away with a dislocated shoulder and a ₹3,60,000 hospital bill. (The totalled car is a separate heartbreak.)',
+      reason: 'One careless truck. Your problem now.' },
+    { subtitle: 'Accident', emoji: '🩼', title: 'A bad fall at the office', cost: 2_10_000,
+      story: 'Two slipped discs from a tumble down the stairs. Spinal procedure and a month of recovery: ₹2,10,000.',
+      reason: 'Your spine isn\'t negotiable.' },
+    // New baby
+    { subtitle: 'New baby', emoji: '👶', title: 'It\'s twins!', cost: 3_80_000,
+      story: 'A C-section, and the smaller twin needs a week in the NICU. The hospital bill: ₹3,80,000. (The diapers come later.)',
+      reason: 'Two heartbeats on the scan. No going back.' },
+    { subtitle: 'New baby', emoji: '🍼', title: 'Your first child arrives', cost: 1_60_000,
+      story: 'An emergency C-section after 14 hours of labour. Delivery and hospital stay: ₹1,60,000.',
+      reason: 'Today is the day, ready or not.' },
+    { subtitle: 'New baby', emoji: '🤰', title: 'Delivery day', cost: 95_000,
+      story: 'A textbook delivery — but the gynaecologist, three nights, and newborn screening still total ₹95,000.',
+      reason: 'Babies don\'t check your bank balance first.' },
   ];
-  const pick = events[Math.floor(rng.next() * events.length)];
-  const cost = Math.round(pick.min + rng.next() * (pick.max - pick.min));
+  const pick = scenarios[Math.floor(rng.next() * scenarios.length)];
+  const cost = pick.cost;
 
   return {
     id: newId('card', state),
     kind: 'unseen_expense',
     emoji: pick.emoji,
     title: pick.title,
-    subtitle: 'Unavoidable',
-    description: `A non-negotiable ₹${cost.toLocaleString('en-IN')} expense. You cannot walk away — only choose how to pay.`,
+    subtitle: pick.subtitle,
+    description: pick.story,
     rows: [{ label: 'Cost', value: `₹${cost.toLocaleString('en-IN')}` }],
     options: [
       {
@@ -704,7 +760,7 @@ function lifeEventCard(state: GameState, rng: PRNG): Card {
         affordCheck: (s) => (s.cashOnHand < cost ? `Need ₹${cost.toLocaleString('en-IN')} — short by ₹${(cost - s.cashOnHand).toLocaleString('en-IN')}` : null),
         apply: (s) => {
           s.cashOnHand -= cost;
-          return `Paid ₹${cost.toLocaleString('en-IN')} for ${pick.title.toLowerCase()}`;
+          return `Paid ₹${cost.toLocaleString('en-IN')} — ${pick.title}`;
         },
         coachWarning: `Best case: your emergency fund absorbs this with zero interest. This is exactly what it's for.`,
       },
