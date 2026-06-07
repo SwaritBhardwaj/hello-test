@@ -183,6 +183,22 @@ export const UI = {
   'bs.tenureMonths': { en: 'Tenure ({m} months ≈ {y} years)', hi: 'अवधि ({m} महीने ≈ {y} साल)' },
   'bs.principalReceived': { en: 'Principal received', hi: 'प्राप्त मूलधन' },
   'bs.takeLoan': { en: 'Take this loan', hi: 'यह कर्ज़ लें' },
+  'bs.emiRow': { en: 'EMI', hi: 'ईएमआई' },
+
+  // Asset groups (statement ledger)
+  'group.Real Estate': { en: 'Real Estate', hi: 'रियल एस्टेट' },
+  'group.Equity': { en: 'Equity', hi: 'इक्विटी' },
+  'group.Gold': { en: 'Gold', hi: 'सोना' },
+  'group.Fixed Income': { en: 'Fixed Income', hi: 'फिक्स्ड इनकम' },
+  'group.Crypto': { en: 'Crypto', hi: 'क्रिप्टो' },
+  'group.Other': { en: 'Other', hi: 'अन्य' },
+
+  // Loan types (borrow tab)
+  'loan.personal': { en: 'Personal loan ({r}%)', hi: 'पर्सनल लोन ({r}%)' },
+  'loan.car': { en: 'Car loan ({r}%)', hi: 'कार लोन ({r}%)' },
+  'loan.education': { en: 'Education loan ({r}%)', hi: 'एजुकेशन लोन ({r}%)' },
+  'loan.business': { en: 'Business loan ({r}%)', hi: 'बिज़नेस लोन ({r}%)' },
+  'loan.credit_card': { en: 'Credit card revolve ({r}%)', hi: 'क्रेडिट कार्ड रिवॉल्व ({r}%)' },
 
   // generic
   'common.lakhSuffix': { en: 'L', hi: 'लाख' },
