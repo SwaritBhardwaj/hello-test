@@ -11,6 +11,8 @@ import { useCoachStyle } from '../coachStyle';
 import { MoneyCount } from '../fx/CountUp';
 import { play } from '../sound/sound';
 import { useMute } from '../sound/useSound';
+import { WisdomJournal } from './WisdomJournal';
+import { journalStats } from '@/modules/coach/journal';
 
 // ============================================================
 // HUD bar — identity + money pills + controls, edge-docked & high-contrast
@@ -24,6 +26,8 @@ export function HudBar({ onOpenSheet }: { onOpenSheet: () => void }) {
   const toggleCoach = useGameStore((s) => s.toggleCoachMode);
   const [muted, toggleMute] = useMute();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [journalOpen, setJournalOpen] = useState(false);
+  const js = journalStats();
 
   return (
     <header className="flex items-center justify-between gap-2 flex-wrap">
@@ -66,6 +70,7 @@ export function HudBar({ onOpenSheet }: { onOpenSheet: () => void }) {
                   onClick={() => toggleMute()}
                 />
                 <div className="border-b border-card-edge" />
+                <MenuItem onClick={() => { setJournalOpen(true); setMenuOpen(false); }}>{`Wisdom Journal (${js.seen}/${js.total})`}</MenuItem>
                 <MenuItem onClick={() => { ff(12); setMenuOpen(false); }}>{t('menu.skip1y')}</MenuItem>
                 <MenuItem onClick={() => { ff(60); setMenuOpen(false); }}>{t('menu.skip5y')}</MenuItem>
                 <MenuItem danger onClick={() => { reset(); setMenuOpen(false); }}>{t('menu.newGame')}</MenuItem>
@@ -74,6 +79,7 @@ export function HudBar({ onOpenSheet }: { onOpenSheet: () => void }) {
           </AnimatePresence>
         </div>
       </div>
+      <AnimatePresence>{journalOpen && <WisdomJournal key="journal" onClose={() => setJournalOpen(false)} />}</AnimatePresence>
     </header>
   );
 }

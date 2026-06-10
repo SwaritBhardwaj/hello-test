@@ -12,9 +12,11 @@ import { CardModal } from './CardModal';
 import { BalanceSheet } from './BalanceSheet';
 import { OutcomeModal } from './OutcomeModal';
 import { HistoryPanel } from './HistoryPanel';
-import { CoachInsight } from './CoachInsight';
 import { BankruptcyWarning } from './BankruptcyWarning';
 import { AchievementToasts } from './AchievementToasts';
+import { CoachSprite } from './CoachSprite';
+import { PaydayModal } from './PaydayModal';
+import { ImpactToast } from './ImpactToast';
 
 // ============================================================
 // Main board
@@ -67,6 +69,8 @@ export function BoardScreen() {
     <div className="min-h-[100dvh] felt-table pb-24 sm:pb-6">
       {gameStatus === 'won' && !outcomeDismissed && <Confetti />}
       <AchievementToasts />
+      <CoachSprite />
+      <ImpactToast />
       <div className="mx-auto max-w-5xl px-3 sm:px-5 py-3 sm:py-4 space-y-3">
         {/* HUD bar — identity + money pills + controls, edge-docked & high-contrast */}
         <HudBar onOpenSheet={() => setSheetOpen(true)} />
@@ -84,13 +88,10 @@ export function BoardScreen() {
           passive={state.statement.passiveIncome} expenses={state.statement.totalExpenses}
         />
 
-        <CoachInsight />
-
         <HistoryPanel data={chartData} notes={notes} />
       </div>
 
-      {/* Sticky mobile roll bar — the single roll CTA on mobile */}
-      {/* INTEGRATION: payday CTA */}
+      {/* Sticky mobile roll bar — the single roll CTA on mobile (payday surfaces via PaydayModal) */}
       <div className="sm:hidden fixed inset-x-0 bottom-0 z-30 bg-felt-900/95 backdrop-blur border-t-2 border-brass/40 px-4 pt-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
         <button
           key={dayPosition} /* remount per move so the idle-pulse delay restarts after each roll */
@@ -102,6 +103,7 @@ export function BoardScreen() {
         </button>
       </div>
 
+      <PaydayModal />
       <AnimatePresence>{currentCard && <CardModal key="card" card={currentCard} />}</AnimatePresence>
       <AnimatePresence>{sheetOpen && <BalanceSheet key="sheet" onClose={() => setSheetOpen(false)} />}</AnimatePresence>
       <AnimatePresence>{showOutcomeModal && <OutcomeModal key="outcome" status={gameStatus} />}</AnimatePresence>

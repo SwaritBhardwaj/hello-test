@@ -143,6 +143,15 @@ export function CoachSprite() {
     if (lastRoll !== null) setBubble((b) => (b && b.kind === 'tutorial' && b.step === 0 ? null : b));
   }, [lastRoll]);
 
+  // Auto-dismiss un-expanded bubbles — there is no backdrop, so they must
+  // never require interaction to clear (verdicts already self-dismiss).
+  useEffect(() => {
+    if (!bubble || bubble.kind === 'verdict') return;
+    if (bubble.kind === 'lesson' && bubble.expanded) return; // player is reading — stay until X
+    const id = setTimeout(() => setBubble(null), 10_000);
+    return () => clearTimeout(id);
+  }, [bubble]);
+
   // Hidden while a card is open, coach mode is off, or no game is running.
   if (!state || !coachMode || currentCard) return null;
 
@@ -162,10 +171,6 @@ export function CoachSprite() {
 
   return (
     <>
-      {/* tap-outside-to-dismiss layer (verdict flashes dismiss themselves) */}
-      {bubble && bubble.kind !== 'verdict' && (
-        <div className="fixed inset-0 z-40" onClick={() => setBubble(null)} aria-hidden />
-      )}
       <div className="fixed z-40 left-3 bottom-[calc(env(safe-area-inset-bottom)+84px)] sm:left-auto sm:right-4 sm:bottom-4">
         <div className="relative flex flex-col items-start sm:items-end">
           <AnimatePresence>
