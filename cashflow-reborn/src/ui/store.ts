@@ -1,10 +1,63 @@
 import { create } from 'zustand';
-import type { GameState, TickInput, DecisionAction } from '@/types';
+import type { GameState, TickInput, DecisionAction, FinancialStatement } from '@/types';
 import { tick, buildInitialState, type SetupOptions, PRNG } from '@/engine';
 import { drawRandomCard, drawCardForTile, rollTileType, type TileType, type Card, type CardOption } from '@/modules/cards/cards';
 import { buildLoan } from '@/modules/loans/loans';
 import { computeStatement } from '@/modules/dashboard/statement';
 import type { CoachDecisionEntry, DecisionCategory } from '@/modules/coach/actionLog';
+import {
+  buildMonthPlan,
+  planSeedFor,
+  eventsCrossed,
+  signedAmount,
+  type MonthPlan,
+  type AppliedMoneyEvent,
+} from '@/modules/calendar/monthPlan';
+import { formatINR } from '@/utils/money';
+
+export type { MonthPlan, MoneyEvent, AppliedMoneyEvent } from '@/modules/calendar/monthPlan';
+
+/** Snapshot shown by the Payday modal when a lap (month) completes. */
+export interface PaydaySummary {
+  /** Month number just closed (matches the "Month N closed" log line). */
+  monthTick: number;
+  salary: number;
+  passive: number;
+  totalExpenses: number;
+  /** Actual cash change produced by the engine tick. */
+  netDelta: number;
+  /** passiveIncome / totalExpenses before the tick (0..1+). */
+  freedomBefore: number;
+  /** passiveIncome / totalExpenses after the tick (0..1+). */
+  freedomAfter: number;
+}
+
+/** Before/after effect of a player decision, for the impact toast. */
+export interface DecisionImpact {
+  cashDelta: number;
+  /** Change in monthly passive income. */
+  passiveDelta: number;
+  /** Change in freedom ratio (passive/expenses), as a decimal. */
+  coverageDelta: number;
+  uid: number;
+}
+
+/** Freedom ratio = passive income / total expenses (guarded). */
+function freedomRatio(st: FinancialStatement): number {
+  return st.totalExpenses > 0 ? st.passiveIncome / st.totalExpenses : 0;
+}
+
+let impactUid = 0;
+/** Diff two states into a DecisionImpact; null when nothing visibly changed. */
+function computeImpact(before: GameState, after: GameState): DecisionImpact | null {
+  const sb = computeStatement(before);
+  const sa = computeStatement(after);
+  const cashDelta = Math.round(after.cashOnHand - before.cashOnHand);
+  const passiveDelta = Math.round(sa.passiveIncome - sb.passiveIncome);
+  const coverageDelta = freedomRatio(sa) - freedomRatio(sb);
+  if (cashDelta === 0 && passiveDelta === 0 && Math.abs(coverageDelta) < 0.0005) return null;
+  return { cashDelta, passiveDelta, coverageDelta, uid: ++impactUid };
+}
 
 const DAYS_PER_MONTH = 30;
 const CARD_CELLS_PER_MONTH = 7;
@@ -85,10 +138,22 @@ interface GameStore {
   coachMode: boolean;
   /** Player's actual card decisions over time — drives behavioral-pattern lessons. */
   decisionLog: CoachDecisionEntry[];
+  // Cash calendar (preview ledger — engine untouched)
+  /** Preview plan of when money moves this month. */
+  monthPlan: MonthPlan | null;
+  /** Rolling ledger of preview events the pawn has crossed (last 60). */
+  moneyEvents: AppliedMoneyEvent[];
+  /** Net signed preview amount currently applied to cashOnHand; reverted before each tick. */
+  previewAppliedTotal: number;
+  // Payday moment
+  pendingPayday: PaydaySummary | null;
+  // Decision impact toast
+  lastImpact: DecisionImpact | null;
   // Actions
   initGame: (opts: SetupOptions) => void;
   toggleCoachMode: () => void;
   rollDice: () => void;
+  collectPayday: () => void;
   resolveCardOption: (optionId: string) => void;
   resolveCardOptionWithLoan: (optionId: string, loanKind?: 'personal' | 'credit_card') => void;
   closeCard: () => void;
@@ -115,6 +180,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   outcomeDismissed: false,
   coachMode: loadCoachPref(),
   decisionLog: [],
+  monthPlan: null,
+  moneyEvents: [],
+  previewAppliedTotal: 0,
+  pendingPayday: null,
+  lastImpact: null,
 
   toggleCoachMode: () => {
     const next = !get().coachMode;
@@ -136,8 +206,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameStatus: 'playing',
       outcomeDismissed: false,
       decisionLog: [],
+      monthPlan: buildMonthPlan(state, planSeedFor(state)),
+      moneyEvents: [],
+      previewAppliedTotal: 0,
+      pendingPayday: null,
+      lastImpact: null,
     });
   },
+
+  collectPayday: () => set({ pendingPayday: null }),
 
   rollDice: () => {
     const s = get();
@@ -156,27 +233,83 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const upper = lapped ? DAYS_PER_MONTH : target;
     const crossed = s.cardCells.filter((c) => c > prev && c <= upper);
 
+    // ---- Cash-calendar preview: apply plan events the pawn crossed ----
+    // These are cosmetic previews of the month; everything applied here is
+    // reverted before the engine tick so month-end cash is byte-identical
+    // to the original (no-preview) code path.
+    const planEvents = s.monthPlan && s.monthPlan.monthTick === s.state.meta.tick
+      ? eventsCrossed(s.monthPlan, prev, upper)
+      : [];
+    let working = s.state;
+    const appliedEntries: AppliedMoneyEvent[] = [];
+    const eventNotes: string[] = [];
+    let appliedDelta = 0;
+    if (planEvents.length > 0) {
+      working = JSON.parse(JSON.stringify(s.state)) as GameState;
+      for (const e of planEvents) {
+        working.cashOnHand += signedAmount(e);
+        appliedDelta += signedAmount(e);
+        appliedEntries.push({ ...e, balanceAfter: working.cashOnHand, monthTick: working.meta.tick });
+        eventNotes.push(`Day ${e.day} · ${formatINR(e.amount)} ${e.kind === 'credit' ? 'credited' : 'debited'} — ${e.label}`);
+      }
+      working.statement = computeStatement(working);
+    }
+    const previewTotal = s.previewAppliedTotal + appliedDelta;
+    const moneyEvents = [...s.moneyEvents, ...appliedEntries].slice(-60);
+
     if (lapped) {
-      // Run a month tick
-      const result = tick(s.state, { actions: [] });
+      // Revert ALL previews applied this month so tick() starts from the
+      // exact state the old code path would have ticked.
+      const preTick: GameState = working === s.state
+        ? (JSON.parse(JSON.stringify(s.state)) as GameState)
+        : working;
+      preTick.cashOnHand -= previewTotal;
+      const cashBeforeTick = preTick.cashOnHand;
+      const freedomBefore = freedomRatio(computeStatement(preTick));
+      const salaryThisTick = preTick.incomeStreams
+        .filter((i) => i.kind === 'salary')
+        .reduce((sum, i) => sum + i.monthlyGross, 0);
+
+      // Run a month tick (exactly as before)
+      const result = tick(preTick, { actions: [] });
       const nextSeed = (result.state.meta.seed + result.state.meta.tick * 1009) >>> 0;
+      const status = evaluateGameStatus(result.state, s.gameStatus);
+      const payday: PaydaySummary | null = status === 'playing'
+        ? {
+            monthTick: result.state.meta.tick,
+            salary: salaryThisTick,
+            passive: Math.round(result.state.statement.passiveIncome),
+            totalExpenses: Math.round(result.state.statement.totalExpenses),
+            netDelta: result.state.cashOnHand - cashBeforeTick,
+            freedomBefore,
+            freedomAfter: freedomRatio(result.state.statement),
+          }
+        : null;
       set({
         state: result.state,
-        notifications: [...s.notifications, `📅 Month ${result.state.meta.tick} closed`, ...result.notifications].slice(-25),
+        notifications: [...s.notifications, ...eventNotes, `📅 Month ${result.state.meta.tick} closed`, ...result.notifications].slice(-25),
         dayPosition: finalDay,
         lastRoll: roll,
         cardCells: rollCardCells(nextSeed),
         cellTypes: assignCellTypes(rollCardCells(nextSeed), nextSeed),
         pendingCardCells: crossed,
         isRolling: false,
-        gameStatus: evaluateGameStatus(result.state, s.gameStatus),
+        gameStatus: status,
+        monthPlan: buildMonthPlan(result.state, planSeedFor(result.state)),
+        moneyEvents,
+        previewAppliedTotal: 0,
+        pendingPayday: payday,
       });
     } else {
       set({
+        state: working,
+        notifications: eventNotes.length > 0 ? [...s.notifications, ...eventNotes].slice(-25) : s.notifications,
         dayPosition: target,
         lastRoll: roll,
         pendingCardCells: crossed,
         isRolling: false,
+        moneyEvents,
+        previewAppliedTotal: previewTotal,
       });
     }
 
@@ -212,6 +345,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentCard: null,
       gameStatus: evaluateGameStatus(cloned, s.gameStatus),
       decisionLog: [...s.decisionLog, entry],
+      lastImpact: computeImpact(s.state, cloned) ?? s.lastImpact,
     });
     // Draw next pending if any
     setTimeout(() => drawNextCard(), 200);
@@ -259,6 +393,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentCard: null,
       gameStatus: evaluateGameStatus(cloned, s.gameStatus),
       decisionLog: [...s.decisionLog, entry],
+      lastImpact: computeImpact(s.state, cloned) ?? s.lastImpact,
     });
     setTimeout(() => drawNextCard(), 200);
   },
@@ -269,10 +404,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   step: (actions = []) => {
-    const cur = get().state;
+    const g = get();
+    const cur = g.state;
     if (!cur) return;
+    // Discard any cash previews before the real tick (no previews in step).
+    let base = cur;
+    if (g.previewAppliedTotal !== 0) {
+      base = JSON.parse(JSON.stringify(cur)) as GameState;
+      base.cashOnHand -= g.previewAppliedTotal;
+    }
     const input: TickInput = { actions };
-    const result = tick(cur, input);
+    const result = tick(base, input);
     const nextSeed = (result.state.meta.seed + result.state.meta.tick * 1009) >>> 0;
     set({
       state: result.state,
@@ -281,13 +423,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
       cellTypes: assignCellTypes(rollCardCells(nextSeed), nextSeed),
       dayPosition: 0,
       gameStatus: evaluateGameStatus(result.state, get().gameStatus),
+      monthPlan: buildMonthPlan(result.state, planSeedFor(result.state)),
+      previewAppliedTotal: 0,
     });
   },
 
   fastForward: (months) => {
-    const cur = get().state;
+    const g = get();
+    const cur = g.state;
     if (!cur) return;
+    // Discard any cash previews before ticking (no previews in fast-forward).
     let s = cur;
+    if (g.previewAppliedTotal !== 0) {
+      s = JSON.parse(JSON.stringify(cur)) as GameState;
+      s.cashOnHand -= g.previewAppliedTotal;
+    }
     const allNotes: string[] = [];
     let status = get().gameStatus;
     for (let i = 0; i < months; i++) {
@@ -306,6 +456,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       cellTypes: assignCellTypes(rollCardCells(nextSeed), nextSeed),
       dayPosition: 0,
       gameStatus: status,
+      monthPlan: buildMonthPlan(s, planSeedFor(s)),
+      previewAppliedTotal: 0,
     });
   },
 
@@ -332,6 +484,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       notifications: [...s.notifications, note ?? '...'].slice(-25),
       gameStatus: evaluateGameStatus(cloned, s.gameStatus),
       decisionLog: log,
+      lastImpact: computeImpact(s.state, cloned) ?? s.lastImpact,
     });
   },
 
@@ -350,6 +503,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameStatus: 'playing',
       outcomeDismissed: false,
       decisionLog: [],
+      monthPlan: null,
+      moneyEvents: [],
+      previewAppliedTotal: 0,
+      pendingPayday: null,
+      lastImpact: null,
     }),
 }));
 
