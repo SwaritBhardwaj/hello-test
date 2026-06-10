@@ -72,6 +72,25 @@
     box-shadow: 0 1px 0 0 oklch(0.30 0.04 50), 0 2px 6px -3px oklch(0 0 0 / 0.4);
   }
   .btn-3d:disabled { opacity: 0.5; }
+  /* Hide scrollbars on the mobile board track (still scrollable) */
+  .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  /* Sticky CTA: gentle attention pulse after ~4s of idling (CSS-only; the button
+     is remounted on each move so the delay restarts) */
+  .cta-idle-pulse:not(:disabled) {
+    animation: cta-pulse 1.8s ease-in-out 4s infinite;
+  }
+}
+
+@keyframes cta-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 0 0 oklch(0.30 0.04 50), 0 6px 10px -4px oklch(0 0 0 / 0.4);
+  }
+  50% {
+    transform: scale(1.015);
+    box-shadow: 0 4px 0 0 oklch(0.30 0.04 50), 0 0 20px 4px oklch(0.85 0.16 92 / 0.55);
+  }
 }
 
 /* Respect reduced-motion everywhere: collapse all animation + transition */

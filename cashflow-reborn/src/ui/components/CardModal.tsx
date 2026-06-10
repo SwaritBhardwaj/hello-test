@@ -24,6 +24,7 @@ export function CardModal({ card }: { card: Card }) {
   const t = Math.min(5, Math.max(1, card.temptation));
   const visibleOptions = t >= 5 ? card.options.filter((o) => o.id !== 'skip') : card.options;
   const [financeOpen, setFinanceOpen] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
 
   return (
     <ModalShell labelledBy="card-title">
@@ -54,8 +55,9 @@ export function CardModal({ card }: { card: Card }) {
           <div className="text-sm italic text-ink mt-1 leading-snug">"{L(card.temptationReason)}"</div>
         </div>
 
-        <div className="p-5 space-y-3 overflow-y-auto">
-          <p className="text-base text-ink leading-relaxed">{L(card.description)}</p>
+        {/* Scrollable body — context only; decisions live in the sticky footer below */}
+        <div className="p-4 sm:p-5 space-y-2.5 overflow-y-auto flex-1 min-h-0">
+          <p className="text-[15px] sm:text-base text-ink leading-relaxed">{L(card.description)}</p>
           {card.rows && (
             <div className="rounded-lg bg-card-edge p-3 text-sm space-y-1.5 ring-1 ring-[oklch(0.34_0.04_50)/0.15]">
               {card.rows.map((r, i) => (
@@ -67,19 +69,24 @@ export function CardModal({ card }: { card: Card }) {
             </div>
           )}
           {coachMode && card.coachNote && (
-            <div className="rounded-lg bg-income-soft p-3 text-sm leading-relaxed ring-1 ring-income/40">
-              <div className="flex items-center gap-1.5 mb-1.5">
+            /* Coach note collapses to one line — tap to expand */
+            <button
+              onClick={() => setCoachOpen((o) => !o)}
+              aria-expanded={coachOpen}
+              className="w-full text-left rounded-lg bg-income-soft px-3 py-2 text-sm leading-snug ring-1 ring-income/40"
+            >
+              <div className="flex items-start gap-1.5">
                 <CoachMascot mood="happy" size={18} />
-                <span className="font-display font-semibold text-income-ink text-xs uppercase tracking-wider">{ui('coach.label')}</span>
+                <p className={`flex-1 min-w-0 text-income-ink ${coachOpen ? 'leading-relaxed' : 'line-clamp-1'}`}>{L(card.coachNote)}</p>
+                <ChevronDown size={16} className={`shrink-0 mt-0.5 text-income-ink/70 transition-transform ${coachOpen ? 'rotate-180' : ''}`} />
               </div>
-              <p className="text-income-ink">{L(card.coachNote)}</p>
-            </div>
+            </button>
           )}
           <div className="text-sm text-ink-soft flex items-center gap-1.5">
             {ui('card.youHold')} <Coin size={14} /> <span className="font-bold text-ink tnum">{formatINR(state.cashOnHand)}</span>
           </div>
           {t >= 5 && (
-            <div className="rounded-lg bg-expense-soft ring-2 ring-expense px-3 py-2.5 text-sm text-expense-ink font-bold flex items-center gap-2">
+            <div className="rounded-lg bg-expense-soft ring-2 ring-expense px-3 py-2 text-sm text-expense-ink font-bold flex items-center gap-2">
               {ui('card.cantWalk')} {visibleOptions.length === 1 ? ui('card.itsHappening') : ui('card.pickHowPay')}
             </div>
           )}
@@ -87,16 +94,16 @@ export function CardModal({ card }: { card: Card }) {
           <div className="rounded-lg ring-1 ring-[oklch(0.34_0.04_50)] overflow-hidden">
             <button
               onClick={() => setFinanceOpen((o) => !o)}
-              className="w-full flex items-center justify-between px-3 py-2.5 bg-card-edge hover:bg-[oklch(0.90_0.02_86)] transition text-left"
+              className="w-full flex items-center justify-between px-3 py-1.5 bg-card-edge hover:bg-[oklch(0.90_0.02_86)] transition text-left"
             >
               <div className="flex items-center gap-2">
-                <Coin size={16} />
-                <span className="font-display text-sm text-ink font-semibold">{ui('card.yourFinances')}</span>
-                <span className="text-xs text-ink-soft tnum">
+                <Coin size={14} />
+                <span className="font-display text-xs text-ink font-semibold">{ui('card.yourFinances')}</span>
+                <span className="text-2xs text-ink-soft tnum">
                   {ui('card.cash')} <b className={state.cashOnHand < 0 ? 'text-expense-ink' : 'text-income-ink'}>{formatINR(state.cashOnHand, { compact: true })}</b>
                 </span>
               </div>
-              <ChevronDown size={16} className={`text-ink-faint transition-transform ${financeOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown size={14} className={`text-ink-faint transition-transform ${financeOpen ? 'rotate-180' : ''}`} />
             </button>
             <AnimatePresence initial={false}>
               {financeOpen && (
@@ -109,9 +116,11 @@ export function CardModal({ card }: { card: Card }) {
               )}
             </AnimatePresence>
           </div>
+        </div>
 
-          <div className="space-y-2.5 pt-1">
-            {visibleOptions.map((o) => {
+        {/* Sticky footer — decisions are always visible, never below the fold */}
+        <div className="shrink-0 border-t-2 border-card-edge paper px-4 sm:px-5 pt-3 pb-3 space-y-2 shadow-[0_-6px_12px_-8px_oklch(0_0_0/0.25)]">
+          {visibleOptions.map((o) => {
               const cantAfford = o.affordCheck?.(state);
               const isResist = o.id === 'skip';
               const showBorrow = !!cantAfford && o.cashCost && state.cashOnHand < o.cashCost;
@@ -126,7 +135,7 @@ export function CardModal({ card }: { card: Card }) {
                     onClick={() => { if (!cantAfford) { play(isResist ? 'click' : 'coin'); resolve(o.id); } }}
                     disabled={!!cantAfford}
                     className={[
-                      'btn-3d w-full text-left px-4 py-3',
+                      'btn-3d w-full text-left px-4 py-2.5',
                       cantAfford
                         ? 'bg-card-edge border-2 border-card-edge text-ink-soft cursor-not-allowed opacity-60'
                         : isResist
@@ -135,8 +144,8 @@ export function CardModal({ card }: { card: Card }) {
                     ].join(' ')}
                   >
                     <div className="font-display text-base">{L(o.label)}</div>
-                    {o.detail && <div className="text-sm mt-0.5 opacity-80">{L(o.detail)}</div>}
-                    {cantAfford && <div className="text-sm text-expense-ink mt-0.5 font-semibold">{cantAfford}</div>}
+                    {o.detail && <div className="text-xs mt-0.5 opacity-80">{L(o.detail)}</div>}
+                    {cantAfford && <div className="text-xs text-expense-ink mt-0.5 font-semibold">{cantAfford}</div>}
                   </button>
                   {coachMode && warn && <div className={`text-xs leading-snug px-3 py-2 rounded ${warnTone}`}>{warn}</div>}
                   {showBorrow && (
@@ -150,7 +159,6 @@ export function CardModal({ card }: { card: Card }) {
                 </div>
               );
             })}
-          </div>
         </div>
       </motion.div>
     </ModalShell>

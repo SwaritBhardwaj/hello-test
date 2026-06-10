@@ -29,7 +29,9 @@ export function AchievementToasts() {
   return (
     <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[70] w-[min(92vw,22rem)] space-y-2 pointer-events-none">
       <AnimatePresence>
-        {toasts.map((t) => {
+        {/* Show at most 2 toasts at once; the rest stay queued in the store and
+            surface as visible ones auto-dismiss. */}
+        {toasts.slice(0, 2).map((t) => {
           const ach = achievementById(t.achievementId);
           if (!ach) return null;
           return (
