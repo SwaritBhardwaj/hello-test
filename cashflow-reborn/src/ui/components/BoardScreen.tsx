@@ -89,13 +89,16 @@ export function BoardScreen() {
         <HistoryPanel data={chartData} notes={notes} />
       </div>
 
-      {/* Sticky mobile roll bar */}
+      {/* Sticky mobile roll bar — the single roll CTA on mobile */}
+      {/* INTEGRATION: payday CTA */}
       <div className="sm:hidden fixed inset-x-0 bottom-0 z-30 bg-felt-900/95 backdrop-blur border-t-2 border-brass/40 px-4 pt-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
         <button
+          key={dayPosition} /* remount per move so the idle-pulse delay restarts after each roll */
           onClick={handleRoll} disabled={!!currentCard || rolling}
-          className="btn-3d w-full bg-brass-500 enabled:hover:bg-brass-600 text-wood-900 text-lg py-3 flex items-center justify-center gap-2"
+          className="btn-3d cta-idle-pulse w-full bg-brass-500 enabled:hover:bg-brass-600 text-wood-900 text-lg py-3 flex items-center justify-center gap-2"
         >
-          <Die value={lastRoll ?? 6} rolling={rolling} size={30} /> {rolling ? t('board.rolling') : t('board.rollDice')}
+          <Die value={lastRoll ?? 6} rolling={rolling} size={30} />
+          {currentCard ? 'Resolve the card…' : rolling ? t('board.rolling') : t('board.rollDice')}
         </button>
       </div>
 

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { DAYS_IN_MONTH } from '../store';
 import { useT } from '../lang';
@@ -94,29 +94,52 @@ export function OvalBoard({ dayPosition, cellTypes, lastRoll, rolling, canRoll, 
 }
 
 export function PathBoard({ dayPosition, cellTypes, lastRoll, rolling, canRoll, onRoll, coverage, won, passive, expenses, cardSet, nextType }: BoardProps & { cardSet: Set<number>; nextType?: TileType }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const tileRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Keep the current tile in view: park it ~30% from the left edge so the
+  // upcoming stretch of the month (~7-8 tiles) stays visible ahead of the pawn.
+  useEffect(() => {
+    const track = trackRef.current;
+    const tile = tileRefs.current[dayPosition];
+    if (!track || !tile) return;
+    const target = tile.offsetLeft + tile.offsetWidth / 2 - track.clientWidth * 0.25;
+    track.scrollTo({ left: Math.max(0, target), behavior: 'smooth' });
+  }, [dayPosition]);
+
   return (
     <div className="sm:hidden space-y-3">
       <Medallion coverage={coverage} won={won} passive={passive} expenses={expenses}
         lastRoll={lastRoll} rolling={rolling} canRoll={canRoll} onRoll={onRoll} nextType={nextType} compact />
-      <div className="rounded-tile bg-[oklch(0.90_0.03_86)] ring-2 ring-[oklch(0.34_0.04_50)] p-2.5 flex flex-wrap gap-1.5 justify-center">
-        {Array.from({ length: DAYS_IN_MONTH + 1 }, (_, day) => {
-          const isHere = day === dayPosition;
-          const isCard = cardSet.has(day);
-          const isEnd = day === DAYS_IN_MONTH;
-          const type = cellTypes[day];
-          return (
-            <div key={day} className="relative h-7 w-7 grid place-items-center">
-              {isHere && (
-                <motion.div layoutId="pawn-strip" transition={{ type: 'spring', stiffness: 460, damping: 28 }} className="absolute -top-3.5 z-10">
-                  <div className="animate-token-bob"><Pawn size={22} /></div>
-                </motion.div>
-              )}
-              {isEnd ? <div className="h-6 w-6 grid place-items-center rounded-md bg-brass-500 ring-2 ring-[oklch(0.30_0.04_50)] text-wood-900 text-2xs font-bold">★</div>
-                : isCard && type ? <div className={`h-6 w-6 grid place-items-center rounded-md ${TILE_STYLE[type].chip} ${TILE_STYLE[type].text} ${TILE_OUTLINE}`}><TileGlyph type={type} small /></div>
-                : <div className="h-2 w-2 rounded-full bg-[oklch(0.34_0.04_50)]" />}
-            </div>
-          );
-        })}
+      {/* Horizontal scrolling track — styled like the printed board strip */}
+      <div className="rounded-tile bg-[oklch(0.90_0.03_86)] ring-2 ring-[oklch(0.34_0.04_50)] overflow-hidden">
+        <div ref={trackRef} className="scrollbar-hide overflow-x-auto overflow-y-hidden px-3 pt-7 pb-1.5">
+          <div className="relative flex items-center w-max">
+            {/* dark connecting line behind the tiles */}
+            <div className="absolute left-3 right-3 top-1/2 -translate-y-[calc(50%+7px)] h-[3px] rounded-full bg-[oklch(0.34_0.04_50)]" aria-hidden />
+            {Array.from({ length: DAYS_IN_MONTH + 1 }, (_, day) => {
+              const isHere = day === dayPosition;
+              const isCard = cardSet.has(day);
+              const isEnd = day === DAYS_IN_MONTH;
+              const type = cellTypes[day];
+              return (
+                <div key={day} ref={(el) => { tileRefs.current[day] = el; }} className="relative shrink-0 w-10 flex flex-col items-center">
+                  {isHere && (
+                    <motion.div layoutId="pawn-strip" transition={{ type: 'spring', stiffness: 460, damping: 28 }} className="absolute -top-6 z-10">
+                      <div className="animate-token-bob"><Pawn size={24} /></div>
+                    </motion.div>
+                  )}
+                  <div className="relative h-9 grid place-items-center">
+                    {isEnd ? <div className="h-9 w-9 grid place-items-center rounded-md bg-brass-500 ring-2 ring-[oklch(0.30_0.04_50)] text-wood-900 text-base font-bold shadow-piece">★</div>
+                      : isCard && type ? <div className={`h-9 w-9 grid place-items-center rounded-md shadow-piece ${TILE_STYLE[type].chip} ${TILE_STYLE[type].text} ${TILE_OUTLINE}`}><TileGlyph type={type} /></div>
+                      : <div className={`rounded-full ring-2 ring-[oklch(0.34_0.04_50)] ${isHere ? 'h-5 w-5 bg-card' : 'h-4 w-4 bg-[oklch(0.96_0.02_88)]'}`} />}
+                  </div>
+                  <div className={`mt-0.5 leading-none tnum font-semibold ${isHere ? 'text-ink' : 'text-ink-soft'}`} style={{ fontSize: 9 }}>{day}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -148,7 +171,8 @@ export function TileGlyph({ type, small }: { type: TileType; small?: boolean }) 
   return <span className="font-display font-bold leading-none" style={{ fontSize: small ? 12 : 16 }}>{letter}</span>;
 }
 
-/** The center medallion — a clickable dice wrapped by the freedom-goal ring. */
+/** The center medallion — a clickable dice wrapped by the freedom-goal ring.
+ *  In `compact` (mobile) mode it is status-only: the sticky bottom bar is the single roll CTA. */
 export function Medallion({ coverage, won, passive, expenses, lastRoll, rolling, canRoll, onRoll, nextType, compact }: {
   coverage: number; won: boolean; passive: number; expenses: number;
   lastRoll: number | null; rolling: boolean; canRoll: boolean; onRoll: () => void; nextType?: TileType; compact?: boolean;
@@ -156,18 +180,25 @@ export function Medallion({ coverage, won, passive, expenses, lastRoll, rolling,
   const { t } = useT();
   const pct = Math.min(100, coverage * 100);
   return (
-    <div className="relative grid place-items-center" style={{ width: compact ? 230 : 260 }}>
-      <FreedomRing pct={pct} won={won} size={compact ? 224 : 256}>
+    <div className="relative grid place-items-center mx-auto" style={{ width: compact ? 180 : 260 }}>
+      <FreedomRing pct={pct} won={won} size={compact ? 176 : 256}>
         <div className="flex flex-col items-center gap-1">
-          <div className="text-xs uppercase tracking-widest font-display font-bold text-brass-300">{won ? t('board.free') : t('board.freedom')}</div>
-          <div className={`font-display leading-none font-bold ${won ? 'text-brass-300' : 'text-card'}`} style={{ fontSize: 40 }}><PercentCount value={pct} /></div>
-          {/* The dice IS the roll button — big, obvious, clickable */}
-          <button onClick={onRoll} disabled={!canRoll} aria-label={t('board.rollDice')}
-            className="group mt-0.5 grid place-items-center disabled:opacity-60 enabled:hover:scale-105 enabled:active:scale-95 transition-transform">
-            <Die value={lastRoll ?? 1} rolling={rolling} size={compact ? 50 : 58} />
-            <span className="mt-1.5 inline-block btn-3d bg-brass-500 text-wood-900 text-sm px-5 py-1.5 group-enabled:group-hover:bg-brass-600">{rolling ? t('board.rolling') : t('board.tapToRoll')}</span>
-          </button>
-          {nextType && <div className="text-xs text-brass-300 font-semibold mt-1">{t('board.next')} <span className="font-display text-card">{t(`tile.${nextType}` as 'tile.deal')}</span></div>}
+          <div className={`uppercase tracking-widest font-display font-bold text-brass-300 ${compact ? 'text-2xs' : 'text-xs'}`}>{won ? t('board.free') : t('board.freedom')}</div>
+          <div className={`font-display leading-none font-bold ${won ? 'text-brass-300' : 'text-card'}`} style={{ fontSize: compact ? 28 : 40 }}><PercentCount value={pct} /></div>
+          {compact ? (
+            /* Status-only: small die echoes the last roll; rolling happens in the sticky bar */
+            <div className="mt-0.5 grid place-items-center" aria-hidden>
+              <Die value={lastRoll ?? 6} rolling={rolling} size={34} />
+            </div>
+          ) : (
+            /* The dice IS the roll button — big, obvious, clickable (desktop) */
+            <button onClick={onRoll} disabled={!canRoll} aria-label={t('board.rollDice')}
+              className="group mt-0.5 grid place-items-center disabled:opacity-60 enabled:hover:scale-105 enabled:active:scale-95 transition-transform">
+              <Die value={lastRoll ?? 1} rolling={rolling} size={58} />
+              <span className="mt-1.5 inline-block btn-3d bg-brass-500 text-wood-900 text-sm px-5 py-1.5 group-enabled:group-hover:bg-brass-600">{rolling ? t('board.rolling') : t('board.tapToRoll')}</span>
+            </button>
+          )}
+          {nextType && <div className={`text-brass-300 font-semibold ${compact ? 'text-2xs mt-0.5' : 'text-xs mt-1'}`}>{t('board.next')} <span className="font-display text-card">{t(`tile.${nextType}` as 'tile.deal')}</span></div>}
         </div>
       </FreedomRing>
       <div className="mt-1.5 text-xs tnum flex items-center gap-1.5 font-semibold">

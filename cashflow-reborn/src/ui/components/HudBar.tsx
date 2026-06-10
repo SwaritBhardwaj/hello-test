@@ -20,15 +20,18 @@ export function HudBar({ onOpenSheet }: { onOpenSheet: () => void }) {
   const state = useGameStore((s) => s.state)!;
   const ff = useGameStore((s) => s.fastForward);
   const reset = useGameStore((s) => s.reset);
+  const coachMode = useGameStore((s) => s.coachMode);
+  const toggleCoach = useGameStore((s) => s.toggleCoachMode);
+  const [muted, toggleMute] = useMute();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header className="flex items-center justify-between gap-2 flex-wrap">
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         <Pawn size={26} />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="font-display text-base sm:text-lg text-card leading-none truncate">{state.player.name}</div>
-          <div className="mt-0.5"><LevelBadge /></div>
+          <div className="mt-1"><LevelBadge /></div>
         </div>
       </div>
       <div className="flex items-center gap-1.5 order-3 sm:order-2 w-full sm:w-auto justify-between sm:justify-end mt-1 sm:mt-0">
@@ -37,18 +40,32 @@ export function HudBar({ onOpenSheet }: { onOpenSheet: () => void }) {
         <MoneyPill label={t('hud.cashflow')} value={state.statement.totalIncome - state.statement.totalExpenses} signed tone={state.statement.totalIncome - state.statement.totalExpenses >= 0 ? 'income' : 'expense'} />
       </div>
       <div className="flex items-center gap-1.5 order-2 sm:order-3">
-        <LanguageToggle />
-        <CoachStyleToggle />
-        <MuteToggle />
-        <CoachToggle />
         <button onClick={() => { play('click'); onOpenSheet(); }} className="btn-3d bg-brass-500 enabled:hover:bg-brass-600 text-wood-900 px-3 py-1.5 text-sm whitespace-nowrap">
           <span className="hidden sm:inline">{t('hud.balanceSheet')}</span><span className="sm:hidden">{t('hud.sheet')}</span>
         </button>
         <div className="relative">
-          <button onClick={() => setMenuOpen((o) => !o)} className="rounded-xl bg-felt-700 hover:bg-felt-600 text-card px-3 py-2 text-sm shadow-piece transition active:scale-95" aria-label="More actions"><MoreHorizontal size={20} /></button>
+          <button onClick={() => setMenuOpen((o) => !o)} className="rounded-xl bg-felt-700 hover:bg-felt-600 text-card px-3 py-2 text-sm shadow-piece transition active:scale-95" aria-label="More actions" aria-expanded={menuOpen}><MoreHorizontal size={20} /></button>
           <AnimatePresence>
             {menuOpen && (
-              <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="absolute right-0 mt-2 w-44 paper rounded-xl shadow-card ring-1 ring-card-edge z-30 overflow-hidden">
+              <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="absolute right-0 mt-2 w-56 paper rounded-xl shadow-card ring-1 ring-card-edge z-30 overflow-hidden">
+                {/* Settings rows — moved out of the header to declutter it */}
+                <div className="px-4 py-2.5 flex items-center justify-between gap-2 border-b border-card-edge">
+                  <span className="text-sm text-ink font-semibold">Language</span>
+                  <LanguageToggle />
+                </div>
+                <MenuToggleRow
+                  label={t('coach.label')}
+                  on={coachMode}
+                  icon={<CoachMascot mood="happy" size={18} />}
+                  onClick={() => toggleCoach()}
+                />
+                <MenuToggleRow
+                  label="Sound"
+                  on={!muted}
+                  icon={muted ? <VolumeX size={16} className="text-ink-soft" /> : <Volume2 size={16} className="text-ink" />}
+                  onClick={() => toggleMute()}
+                />
+                <div className="border-b border-card-edge" />
                 <MenuItem onClick={() => { ff(12); setMenuOpen(false); }}>{t('menu.skip1y')}</MenuItem>
                 <MenuItem onClick={() => { ff(60); setMenuOpen(false); }}>{t('menu.skip5y')}</MenuItem>
                 <MenuItem danger onClick={() => { reset(); setMenuOpen(false); }}>{t('menu.newGame')}</MenuItem>
@@ -58,6 +75,22 @@ export function HudBar({ onOpenSheet }: { onOpenSheet: () => void }) {
         </div>
       </div>
     </header>
+  );
+}
+
+/** Labeled on/off row used inside the ⋯ menu (coach, sound). */
+export function MenuToggleRow({ label, on, icon, onClick }: { label: string; on: boolean; icon: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      onClick={() => { play('click'); onClick(); }}
+      role="switch" aria-checked={on}
+      className="w-full px-4 py-2.5 flex items-center justify-between gap-2 border-b border-card-edge hover:bg-card-edge transition text-left"
+    >
+      <span className="flex items-center gap-2 text-sm text-ink font-semibold">{icon}{label}</span>
+      <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition ${on ? 'bg-income' : 'bg-ink-faint/40 ring-1 ring-card-edge'}`} aria-hidden>
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-card shadow-piece transition-all ${on ? 'left-[18px]' : 'left-0.5'}`} />
+      </span>
+    </button>
   );
 }
 
@@ -148,9 +181,17 @@ export function LevelBadge() {
   const state = useGameStore((s) => s.state)!;
   const { rank, next, progress } = rankFor(state);
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-felt-900/60 ring-1 ring-brass/40 pl-1 pr-2 py-0.5" title={next ? `${Math.round(progress * 100)}% to ${next.label}` : 'Top rank'}>
-      <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-brass-500 text-wood-900 text-[9px] font-bold">{rank.index + 1}</span>
-      <span className="text-card font-display text-xs font-semibold whitespace-nowrap">{rank.label}</span>
-    </span>
+    <div className="inline-flex flex-col gap-1 rounded-xl bg-felt-900/60 ring-1 ring-brass/40 pl-1.5 pr-2.5 py-1 max-w-full min-w-0" title={next ? `${Math.round(progress * 100)}% to ${next.label}` : 'Top rank'}>
+      <span className="inline-flex items-center gap-1.5 min-w-0">
+        <span className="inline-flex shrink-0 items-center justify-center w-4 h-4 rounded-full bg-brass-500 text-wood-900 text-[9px] font-bold">{rank.index + 1}</span>
+        <span className="text-card font-display text-xs font-semibold whitespace-nowrap truncate min-w-0">{rank.label}</span>
+        {next && <span className="text-card/60 font-display whitespace-nowrap shrink-0" style={{ fontSize: 10 }}>→ {next.label}</span>}
+      </span>
+      {next && (
+        <span className="block h-1 w-full rounded-full bg-felt-900 ring-1 ring-brass/25 overflow-hidden" aria-hidden>
+          <span className="block h-full rounded-full bg-brass-500 transition-all duration-500" style={{ width: `${Math.max(2, Math.round(progress * 100))}%` }} />
+        </span>
+      )}
+    </div>
   );
 }
