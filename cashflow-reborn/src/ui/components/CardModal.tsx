@@ -29,8 +29,9 @@ export function CardModal({ card }: { card: Card }) {
   return (
     <ModalShell labelledBy="card-title">
       <motion.div
-        initial={{ opacity: 0, y: 24, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.96 }}
-        transition={{ type: 'spring', stiffness: 280, damping: 26 }}
+        initial={{ opacity: 0, rotateY: 90, scale: 0.96 }} animate={{ opacity: 1, rotateY: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.96 }}
+        transition={{ type: 'spring', stiffness: 220, damping: 22 }}
+        style={{ transformPerspective: 1200 }}
         className="paper w-full sm:max-w-md rounded-t-game sm:rounded-game shadow-card ring-4 ring-brass/50 overflow-hidden max-h-[92dvh] flex flex-col"
       >
         <div className="bg-wood-700 text-card px-5 py-3 flex items-center gap-3">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VolumeX, Volume2, MoreHorizontal } from 'lucide-react';
 import { useGameStore } from '../store';
@@ -13,6 +13,9 @@ import { play } from '../sound/sound';
 import { useMute } from '../sound/useSound';
 import { WisdomJournal } from './WisdomJournal';
 import { journalStats } from '@/modules/coach/journal';
+import { TrophiesPanel } from './TrophiesPanel';
+import { loadGhost } from '@/modules/progression/storage';
+import { formatINR } from '@/utils/money';
 
 // ============================================================
 // HUD bar — identity + money pills + controls, edge-docked & high-contrast
@@ -27,6 +30,7 @@ export function HudBar({ onOpenSheet }: { onOpenSheet: () => void }) {
   const [muted, toggleMute] = useMute();
   const [menuOpen, setMenuOpen] = useState(false);
   const [journalOpen, setJournalOpen] = useState(false);
+  const [trophiesOpen, setTrophiesOpen] = useState(false);
   const js = journalStats();
 
   return (
@@ -35,7 +39,7 @@ export function HudBar({ onOpenSheet }: { onOpenSheet: () => void }) {
         <Pawn size={26} />
         <div className="min-w-0 flex-1">
           <div className="font-display text-base sm:text-lg text-card leading-none truncate">{state.player.name}</div>
-          <div className="mt-1"><LevelBadge /></div>
+          <div className="mt-1 flex items-center gap-1.5"><LevelBadge /><GhostPill /></div>
         </div>
       </div>
       <div className="flex items-center gap-1.5 order-3 sm:order-2 w-full sm:w-auto justify-between sm:justify-end mt-1 sm:mt-0">
@@ -70,6 +74,7 @@ export function HudBar({ onOpenSheet }: { onOpenSheet: () => void }) {
                   onClick={() => toggleMute()}
                 />
                 <div className="border-b border-card-edge" />
+                <MenuItem onClick={() => { setTrophiesOpen(true); setMenuOpen(false); }}>Trophies & Challenges</MenuItem>
                 <MenuItem onClick={() => { setJournalOpen(true); setMenuOpen(false); }}>{`Wisdom Journal (${js.seen}/${js.total})`}</MenuItem>
                 <MenuItem onClick={() => { ff(12); setMenuOpen(false); }}>{t('menu.skip1y')}</MenuItem>
                 <MenuItem onClick={() => { ff(60); setMenuOpen(false); }}>{t('menu.skip5y')}</MenuItem>
@@ -80,7 +85,28 @@ export function HudBar({ onOpenSheet }: { onOpenSheet: () => void }) {
         </div>
       </div>
       <AnimatePresence>{journalOpen && <WisdomJournal key="journal" onClose={() => setJournalOpen(false)} />}</AnimatePresence>
+      <AnimatePresence>{trophiesOpen && <TrophiesPanel key="trophies" onClose={() => setTrophiesOpen(false)} />}</AnimatePresence>
     </header>
+  );
+}
+
+/** "vs best" pill — compares current net worth against the ghost (fastest winning) run at the same month. */
+export function GhostPill() {
+  const state = useGameStore((s) => s.state)!;
+  const ghost = useMemo(() => loadGhost(), []);
+  const at = useMemo(() => {
+    if (!ghost) return null;
+    const pt = ghost.points.find((p) => p.tick === state.meta.tick);
+    return pt ? pt.netWorth : null;
+  }, [ghost, state.meta.tick]);
+  if (at === null) return null;
+  const delta = state.statement.netWorth - at;
+  const ahead = delta >= 0;
+  return (
+    <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 tnum whitespace-nowrap ${ahead ? 'bg-income/20 text-income ring-income/40' : 'bg-felt-900/60 text-card/70 ring-card/20'}`}
+      title="Your net worth vs your best run, same month">
+      {ahead ? '↑' : '↓'} vs best {formatINR(Math.abs(delta), { compact: true })}
+    </span>
   );
 }
 

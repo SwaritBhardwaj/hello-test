@@ -14,6 +14,7 @@ import { OutcomeModal } from './OutcomeModal';
 import { HistoryPanel } from './HistoryPanel';
 import { BankruptcyWarning } from './BankruptcyWarning';
 import { AchievementToasts } from './AchievementToasts';
+import { ChallengeToasts } from './TrophiesPanel';
 import { CoachSprite } from './CoachSprite';
 import { PaydayModal } from './PaydayModal';
 import { ImpactToast } from './ImpactToast';
@@ -73,6 +74,7 @@ export function BoardScreen() {
       ))}
       {gameStatus === 'won' && !outcomeDismissed && <Confetti />}
       <AchievementToasts />
+      <ChallengeToasts />
       <CoachSprite />
       <ImpactToast />
       <div className="relative mx-auto max-w-5xl px-3 sm:px-5 py-3 sm:py-4 space-y-3">
