@@ -8,6 +8,7 @@ import { useProgression } from '../progression';
 import type { RunScore } from '@/modules/progression/score';
 import { bestEscape } from '@/modules/progression/storage';
 import { ModalShell, PrimaryButton } from './primitives';
+import { ShareResult } from './ShareCard';
 
 // ============================================================
 // Outcome modal
@@ -51,6 +52,16 @@ export function OutcomeModal({ status }: { status: 'won' | 'lost' }) {
             {best && <ResultRow label={isNewBest ? t('outcome.newBest') : t('outcome.yourBest')} value={`${Math.floor(best.months / 12)}y ${best.months % 12}m`} tone={isNewBest ? 'income' : undefined} />}
           </div>
           <div className="space-y-2">
+            <ShareResult
+              data={{
+                won,
+                playerName: state.player.name,
+                profession: state.player.profession,
+                netWorth: state.statement.netWorth,
+                months: state.meta.tick,
+                grade: score?.grade ?? 'C',
+              }}
+            />
             <PrimaryButton onClick={newRun} className="w-full">{t('outcome.newRun')}</PrimaryButton>
             <button onClick={dismiss} className="btn-3d w-full bg-card text-ink px-4 py-2.5 text-sm">{won ? t('outcome.keepPlaying') : t('outcome.viewWreckage')}</button>
           </div>

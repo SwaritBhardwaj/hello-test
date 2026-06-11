@@ -15,7 +15,8 @@ export interface AchievementContext {
   log: CoachDecisionEntry[];
 }
 
-function distinctAssetGroups(state: GameState): number {
+/** Count broad asset classes held (RE, equity, gold, fixed income, crypto). Shared with challenges. */
+export function distinctAssetGroups(state: GameState): number {
   const groups = new Set<string>();
   for (const a of state.assets) {
     if (a.kind.startsWith('real_estate') || a.kind === 'reit') groups.add('re');
