@@ -1,6 +1,7 @@
 import type { Grade } from './score';
 
 const ACH_KEY = 'cashflow-reborn:achievements';
+const CHALLENGE_KEY = 'cashflow-reborn:challenges';
 const RUNS_KEY = 'cashflow-reborn:runs';
 const GHOST_KEY = 'cashflow-reborn:ghost';
 
@@ -44,6 +45,14 @@ export function loadUnlocked(): string[] {
 
 export function saveUnlocked(ids: string[]): void {
   write(ACH_KEY, ids);
+}
+
+export function loadCompletedChallenges(): string[] {
+  return read<string[]>(CHALLENGE_KEY, []);
+}
+
+export function saveCompletedChallenges(ids: string[]): void {
+  write(CHALLENGE_KEY, ids);
 }
 
 export function loadRuns(): RunRecord[] {
