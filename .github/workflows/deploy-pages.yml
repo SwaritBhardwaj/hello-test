@@ -42,9 +42,12 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # TEMP: environment block removed so the feature-branch preview isn't
+    # rejected by the github-pages environment's default-branch-only rule.
+    # Restore before merge:
+    #   environment:
+    #     name: github-pages
+    #     url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
