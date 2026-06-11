@@ -45,7 +45,7 @@ export function CardModal({ card }: { card: Card }) {
           transition={{ delay: 0.3, type: 'spring', stiffness: 300, damping: 20 }}
           className="absolute -top-[26px] right-7 z-0" aria-hidden
         >
-          <CoachMascot mood={t >= 4 ? 'worried' : 'happy'} size={52} />
+          <CoachMascot mood={t >= 4 ? 'worried' : 'happy'} size={64} />
         </motion.div>
       )}
       <motion.div
@@ -359,6 +359,7 @@ export function CardFinancePanel({ state, applyAction }: { state: ReturnType<typ
 // action only fires on the second tap. Shared with the balance sheet.
 // ============================================================
 export function InterventionNotice({ guard }: { guard: Intervention }) {
+  const { t: ui, L } = useT();
   return (
     <motion.div
       initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
@@ -367,8 +368,8 @@ export function InterventionNotice({ guard }: { guard: Intervention }) {
     >
       <CoachMascot mood="worried" size={26} />
       <div className="min-w-0 text-xs leading-snug">
-        <div className="text-caution-ink font-semibold">{guard.message}</div>
-        <div className="text-ink-soft mt-0.5 font-medium">Tap again if you're sure.</div>
+        <div className="text-caution-ink font-semibold">{L(guard.message)}</div>
+        <div className="text-ink-soft mt-0.5 font-medium">{ui('coach.tapAgain')}</div>
       </div>
     </motion.div>
   );

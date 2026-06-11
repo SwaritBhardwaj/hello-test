@@ -202,6 +202,36 @@ export const UI = {
 
   // generic
   'common.lakhSuffix': { en: 'L', hi: 'लाख' },
+
+  // Coach sprite bubbles
+  'coach.tip': { en: 'Coach tip {n}/3', hi: 'कोच टिप {n}/3' },
+  'coach.tapMore': { en: 'Tap for more', hi: 'अधिक के लिए टैप करें' },
+  'coach.niceResist': { en: 'Nice resist.', hi: 'बढ़िया, रुक गए।' },
+  'coach.paydayGood': { en: 'Banked {x} this month. Keep stacking.', hi: 'इस महीने {x} बचाए। ऐसे ही चलते रहें।' },
+  'coach.paydayBad': { en: 'Burned {x} more than you made. Watch the bleed.', hi: 'आमदनी से {x} ज़्यादा खर्च हुआ। घाटे पर नज़र रखें।' },
+  'coach.freedom25': { en: '25% free — a quarter of your expenses pay for themselves.', hi: '25% आज़ाद — एक चौथाई खर्च खुद चुक रहा है।' },
+  'coach.freedom50': { en: 'Halfway out! Passive income now covers half your life.', hi: 'आधे रास्ते! निष्क्रिय आय अब आधे खर्च उठा रही है।' },
+  'coach.freedom75': { en: '75% free. The rat race is losing its grip on you.', hi: '75% आज़ाद। चूहा-दौड़ की पकड़ ढीली पड़ रही है।' },
+  'coach.tutorial0': { en: 'Tap the big dice to roll — each day costs and earns money.', hi: 'बड़े पासे को टैप करें — हर दिन पैसा आता-जाता है।' },
+  'coach.tutorial1': { en: 'Tiles draw cards. Green deals grow money; red temptations drain it.', hi: 'टाइल कार्ड खींचती हैं। हरे सौदे पैसा बढ़ाते, लाल लालच घटाते हैं।' },
+  'coach.tutorial2': { en: "See the ring? When passive income covers expenses, you're free. Fill it.", hi: 'रिंग दिख रही है? जब निष्क्रिय आय खर्च ढके, आज़ादी मिलती है। भरते रहें।' },
+  'coach.tapAgain': { en: "Tap again if you're sure.", hi: 'पक्का हो तो दोबारा टैप करें।' },
+
+  // Intervention messages
+  'intervention.panicSell': { en: 'Selling into a falling market — again? Last time you locked in the loss and missed the rebound. Still sure?', hi: 'गिरते बाज़ार में फिर बेच रहे हैं? पिछली बार नुकसान पक्का किया और सुधार चूक गए। पक्का है?' },
+  'intervention.borrowDoodad': { en: "An EMI for a toy — again? You've paid interest on fun before, and the interest outlived the fun. Still sure?", hi: 'मनोरंजन के लिए फिर ईएमआई? पहले भी शौक पर ब्याज चुका चुके हैं, और ब्याज शौक से लंबा टिका। पक्का है?' },
+  'intervention.ccBailout': { en: 'Swiping the card again? Your last credit-card bailout charged ~42% a year for the privilege. Still sure?', hi: 'फिर कार्ड स्वाइप? पिछली बार क्रेडिट कार्ड ने ~42% सालाना ब्याज लिया था। पक्का है?' },
+  'intervention.fomoBuy': { en: 'Buying at the top of the cycle — your last peak buy went underwater. Markets were cheaper when you were scared. Still sure?', hi: 'चक्र के शिखर पर खरीद रहे हैं — पिछली बार की पीक खरीद डूब गई थी। जब डर था, बाज़ार सस्ता था। पक्का है?' },
+
+  // Counterfactual debrief
+  'debrief.title': { en: 'Coach debrief — what if?', hi: 'कोच समीक्षा — क्या होता अगर?' },
+  'debrief.soldDownturn': { en: 'Sold {label} in a downturn', hi: 'मंदी में {label} बेचा' },
+  'debrief.boughtLoan': { en: 'Bought {label} on a loan', hi: '{label} कर्ज़ पर खरीदा' },
+  'debrief.bought': { en: 'Bought {label}', hi: '{label} खरीदा' },
+  'debrief.holdRicher': { en: 'Holding would\'ve left you {x} richer today.', hi: 'रोकते तो आज {x} ज़्यादा होता।' },
+  'debrief.sellSaved': { en: 'Good call — selling saved you {x}.', hi: 'सही फ़ैसला — बेचकर {x} बचाए।' },
+  'debrief.skipRicher': { en: 'Skipping it would\'ve left you {x} richer today.', hi: 'छोड़ते तो आज {x} ज़्यादा होता।' },
+  'debrief.workedOut': { en: 'It worked out — you\'re {x} ahead.', hi: 'काम आया — आप {x} आगे हैं।' },
 } satisfies Record<string, Record<Lang, string>>;
 
 export type UIKey = keyof typeof UI;

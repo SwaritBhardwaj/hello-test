@@ -23,11 +23,7 @@ import { formatINR } from '@/utils/money';
 const TUTORIAL_KEY = 'cashflow-reborn:tutorial-done';
 const VERDICT_MS = 2500;
 
-const TUTORIAL_STEPS: readonly string[] = [
-  'Tap the big dice to roll — each day costs and earns money.',
-  'Tiles draw cards. Green deals grow money; red temptations drain it.',
-  "See the ring? When passive income covers expenses, you're free. Fill it.",
-];
+const TUTORIAL_KEYS = ['coach.tutorial0', 'coach.tutorial1', 'coach.tutorial2'] as const;
 
 /** Pose for a just-resolved card decision. Classifies on the ENGLISH warning
  *  text ("Best…" / "WORST…"), independent of the display language. Returns
@@ -49,7 +45,7 @@ type Bubble =
   | { kind: 'tutorial'; step: number; text: string };
 
 export function CoachSprite() {
-  const { L } = useT();
+  const { t, L } = useT();
   const state = useGameStore((s) => s.state);
   const coachMode = useGameStore((s) => s.coachMode);
   const currentCard = useGameStore((s) => s.currentCard);
@@ -105,7 +101,7 @@ export function CoachSprite() {
     if (!pose) return;
     const text = opt?.coachWarning
       ? L(opt.coachWarning)
-      : entry.category === 'resist' ? 'Nice resist.' : null;
+      : entry.category === 'resist' ? t('coach.niceResist') : null;
     setFlashPose(pose);
     if (text) setBubble({ kind: 'verdict', text, pose });
     if (verdictTimer.current) clearTimeout(verdictTimer.current);
@@ -130,8 +126,8 @@ export function CoachSprite() {
     const good = collected.netDelta >= 0;
     const pose: CoachMood = good ? 'celebrate' : 'worried';
     const text = good
-      ? `Banked ${formatINR(collected.netDelta, { compact: true })} this month. Keep stacking.`
-      : `Burned ${formatINR(-collected.netDelta, { compact: true })} more than you made. Watch the bleed.`;
+      ? t('coach.paydayGood', { x: formatINR(collected.netDelta, { compact: true }) })
+      : t('coach.paydayBad', { x: formatINR(-collected.netDelta, { compact: true }) });
     setFlashPose(pose);
     setBubble({ kind: 'verdict', text, pose });
     if (verdictTimer.current) clearTimeout(verdictTimer.current);
@@ -158,10 +154,10 @@ export function CoachSprite() {
     if (!crossed) return;
     const pct = Math.round(crossed * 100);
     const text = crossed === 0.75
-      ? '75% free. The rat race is losing its grip on you.'
+      ? t('coach.freedom75')
       : crossed === 0.5
-        ? 'Halfway out! Passive income now covers half your life.'
-        : '25% free — a quarter of your expenses pay for themselves.';
+        ? t('coach.freedom50')
+        : t('coach.freedom25');
     setFlashPose('celebrate');
     setBubble({ kind: 'verdict', text: `${pct}% · ${text}`, pose: 'celebrate' });
     if (verdictTimer.current) clearTimeout(verdictTimer.current);
@@ -204,7 +200,7 @@ export function CoachSprite() {
     }
     if (step === null) return;
     tutShown.current.add(step);
-    setBubble({ kind: 'tutorial', step, text: TUTORIAL_STEPS[step] });
+    setBubble({ kind: 'tutorial', step, text: t(TUTORIAL_KEYS[step]) });
     if (step === 2 && typeof localStorage !== 'undefined') localStorage.setItem(TUTORIAL_KEY, '1');
   }, [state, decisionLog, lastRoll]);
 
@@ -275,7 +271,7 @@ export function CoachSprite() {
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: 'spring', stiffness: 380, damping: 15 }}
             >
-              <CoachMascot mood={pose} size={56} />
+              <CoachMascot mood={pose} size={68} />
             </motion.div>
             {showBadge && (
               <span className="absolute -top-0.5 -right-0.5 w-[18px] h-[18px] rounded-full bg-caution text-wood-900 text-[11px] font-bold grid place-items-center ring-2 ring-card shadow-piece">
@@ -290,10 +286,11 @@ export function CoachSprite() {
 }
 
 function SpeechBubbleBody({ bubble, onClose, onExpand }: { bubble: Bubble; onClose: () => void; onExpand: () => void }) {
+  const { t } = useT();
   if (bubble.kind === 'verdict') {
     return (
       <div className="px-3 py-2.5">
-        <div className="text-2xs uppercase tracking-widest font-display text-brass-600">Coach</div>
+        <div className="text-2xs uppercase tracking-widest font-display text-brass-600">{t('coach.label')}</div>
         <div className="text-sm text-ink leading-snug mt-0.5">{bubble.text}</div>
       </div>
     );
@@ -302,7 +299,7 @@ function SpeechBubbleBody({ bubble, onClose, onExpand }: { bubble: Bubble; onClo
     return (
       <div className="px-3 py-2.5 pr-8 relative">
         <CloseX onClose={onClose} />
-        <div className="text-2xs uppercase tracking-widest font-display text-brass-600">Coach tip {bubble.step + 1}/3</div>
+        <div className="text-2xs uppercase tracking-widest font-display text-brass-600">{t('coach.tip', { n: bubble.step + 1 })}</div>
         <div className="text-sm text-ink leading-snug mt-0.5">{bubble.text}</div>
       </div>
     );
@@ -311,7 +308,7 @@ function SpeechBubbleBody({ bubble, onClose, onExpand }: { bubble: Bubble; onClo
   return (
     <div className="px-3 py-2.5 pr-8 relative">
       <CloseX onClose={onClose} />
-      <div className="text-2xs uppercase tracking-widest font-display text-brass-600">Coach</div>
+      <div className="text-2xs uppercase tracking-widest font-display text-brass-600">{t('coach.label')}</div>
       {expanded ? (
         <>
           <div className="text-sm text-ink leading-snug mt-0.5">{lesson.lesson}</div>
@@ -325,7 +322,7 @@ function SpeechBubbleBody({ bubble, onClose, onExpand }: { bubble: Bubble; onClo
       ) : (
         <button onClick={(e) => { e.stopPropagation(); play('click'); onExpand(); }} className="block text-left w-full">
           <div className="text-sm text-ink leading-snug mt-0.5 line-clamp-3">{lesson.lesson}</div>
-          <div className="mt-1 text-2xs font-semibold text-brass-600 uppercase tracking-wide">Tap for more</div>
+          <div className="mt-1 text-2xs font-semibold text-brass-600 uppercase tracking-wide">{t('coach.tapMore')}</div>
         </button>
       )}
     </div>

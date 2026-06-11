@@ -48,7 +48,7 @@ export function OutcomeModal({ status }: { status: 'won' | 'lost' }) {
               transition={{ delay: 0.25, type: 'spring', stiffness: 280, damping: 16 }}
               className="flex justify-center mb-1"
             >
-              <CoachMascot mood={won ? 'celebrate' : 'facepalm'} size={56} />
+              <CoachMascot mood={won ? 'celebrate' : 'facepalm'} size={68} />
             </motion.div>
           ) : (
             <div className="text-5xl mb-1">{won ? '★' : '✖'}</div>
@@ -116,13 +116,14 @@ export function ResultRow({ label, value, tone }: { label: string; value: string
 // debatable calls, shown only when the gap was meaningful.
 // ============================================================
 function CoachDebrief({ records, endTick }: { records: import('@/modules/coach/counterfactual').CounterfactualRecord[]; endTick: number }) {
+  const { t } = useT();
   const results = useMemo(() => evaluateCounterfactuals(records, endTick), [records, endTick]);
   if (results.length === 0) return null;
   return (
     <div className="rounded-lg ring-1 ring-card-edge overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2 bg-card-edge/30">
         <CoachMascot mood="worried" size={24} />
-        <div className="font-display text-ink text-sm">Coach debrief — what if?</div>
+        <div className="font-display text-ink text-sm">{t('debrief.title')}</div>
       </div>
       <div className="divide-y divide-card-edge">
         {results.map((r) => <DebriefRow key={`${r.tick}-${r.label}`} r={r} />)}
@@ -132,16 +133,17 @@ function CoachDebrief({ records, endTick }: { records: import('@/modules/coach/c
 }
 
 function DebriefRow({ r }: { r: CounterfactualResult }) {
+  const { t } = useT();
   const mistake = r.delta > 0;
   const what = r.kind === 'panic_sell'
-    ? `Sold ${r.label} in a downturn`
-    : r.kind === 'doodad_loan' ? `Bought ${r.label} on a loan` : `Bought ${r.label}`;
+    ? t('debrief.soldDownturn', { label: r.label })
+    : r.kind === 'doodad_loan' ? t('debrief.boughtLoan', { label: r.label }) : t('debrief.bought', { label: r.label });
   const verdict = r.kind === 'panic_sell'
-    ? (mistake ? `Holding would've left you ${formatINR(r.delta, { compact: true })} richer today.` : `Good call — selling saved you ${formatINR(-r.delta, { compact: true })}.`)
-    : (mistake ? `Skipping it would've left you ${formatINR(r.delta, { compact: true })} richer today.` : `It worked out — you're ${formatINR(-r.delta, { compact: true })} ahead.`);
+    ? (mistake ? t('debrief.holdRicher', { x: formatINR(r.delta, { compact: true }) }) : t('debrief.sellSaved', { x: formatINR(-r.delta, { compact: true }) }))
+    : (mistake ? t('debrief.skipRicher', { x: formatINR(r.delta, { compact: true }) }) : t('debrief.workedOut', { x: formatINR(-r.delta, { compact: true }) }));
   return (
     <div className="px-3 py-2 text-sm">
-      <div className="text-2xs uppercase tracking-wide text-ink-faint tnum">Month {r.tick}</div>
+      <div className="text-2xs uppercase tracking-wide text-ink-faint tnum">{t('board.month', { n: r.tick })}</div>
       <div className="text-ink font-medium leading-snug">{what}</div>
       <div className={`text-xs leading-snug mt-0.5 font-semibold ${mistake ? 'text-expense-ink' : 'text-income-ink'}`}>{verdict}</div>
     </div>
