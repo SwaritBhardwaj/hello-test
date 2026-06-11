@@ -66,12 +66,16 @@ export function BoardScreen() {
   }
 
   return (
-    <div className="min-h-[100dvh] felt-table pb-24 sm:pb-6">
+    <div className={`min-h-[100dvh] felt-table felt-phase-${state.market.phase} pb-24 sm:pb-6`}>
+      {/* Market-phase ambiance — gradient casts crossfade as the cycle turns */}
+      {(['peak', 'contraction', 'trough'] as const).map((p) => (
+        <div key={p} aria-hidden className={`felt-phase-overlay felt-phase-overlay-${p} ${state.market.phase === p ? 'is-active' : ''}`} />
+      ))}
       {gameStatus === 'won' && !outcomeDismissed && <Confetti />}
       <AchievementToasts />
       <CoachSprite />
       <ImpactToast />
-      <div className="mx-auto max-w-5xl px-3 sm:px-5 py-3 sm:py-4 space-y-3">
+      <div className="relative mx-auto max-w-5xl px-3 sm:px-5 py-3 sm:py-4 space-y-3">
         {/* HUD bar — identity + money pills + controls, edge-docked & high-contrast */}
         <HudBar onOpenSheet={() => setSheetOpen(true)} />
 

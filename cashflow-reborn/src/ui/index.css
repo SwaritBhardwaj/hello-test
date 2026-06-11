@@ -20,7 +20,9 @@
 }
 
 @layer components {
-  /* Board-game felt table with paper grain + warm vignette */
+  /* Board-game felt table with paper grain + warm vignette.
+     The base hue shifts with the market phase (background-color transitions
+     natively; the gradient casts crossfade via .felt-phase-overlay divs). */
   .felt-table {
     background-color: oklch(0.30 0.05 158);
     background-image:
@@ -29,6 +31,37 @@
       radial-gradient(circle at 80% 86%, oklch(0 0 0 / 0.16), transparent 46%),
       repeating-linear-gradient(45deg, oklch(0 0 0 / 0.025) 0 2px, transparent 2px 6px);
     background-attachment: fixed;
+    transition: background-color 2s ease;
+  }
+  /* Market-phase felt tints */
+  .felt-phase-expansion, .felt-phase-recovery { background-color: oklch(0.30 0.05 158); }   /* warm green (default) */
+  .felt-phase-peak { background-color: oklch(0.31 0.055 145); }                              /* warmer, gold-leaning */
+  .felt-phase-contraction { background-color: oklch(0.275 0.03 195); }                       /* cooler, desaturated */
+  .felt-phase-trough { background-color: oklch(0.235 0.025 235); }                           /* darkest, blue-grey */
+  /* Crossfading gradient casts per phase — fixed full-screen, behind content */
+  .felt-phase-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 2s ease;
+  }
+  .felt-phase-overlay.is-active { opacity: 1; }
+  .felt-phase-overlay-peak {
+    background-image:
+      radial-gradient(110% 70% at 50% -5%, oklch(0.85 0.13 90 / 0.12), transparent 60%),
+      radial-gradient(140% 110% at 50% 115%, oklch(0.20 0.05 70 / 0.30), transparent 55%);
+  }
+  .felt-phase-overlay-contraction {
+    background-image:
+      linear-gradient(180deg, oklch(0.50 0.05 220 / 0.07), transparent 45%),
+      radial-gradient(130% 100% at 50% 110%, oklch(0.12 0.03 230 / 0.35), transparent 60%);
+  }
+  .felt-phase-overlay-trough {
+    background-image:
+      linear-gradient(180deg, oklch(0.40 0.06 250 / 0.12), transparent 50%),
+      radial-gradient(140% 110% at 50% 115%, oklch(0.08 0.03 250 / 0.50), transparent 65%),
+      radial-gradient(120% 80% at 50% -10%, oklch(0.10 0.03 250 / 0.30), transparent 55%);
   }
   /* Brass/wood framed panel — the "board" inside the table */
   .board-frame {
@@ -72,6 +105,18 @@
     box-shadow: 0 1px 0 0 oklch(0.30 0.04 50), 0 2px 6px -3px oklch(0 0 0 / 0.4);
   }
   .btn-3d:disabled { opacity: 0.5; }
+  /* Face-down card back — wood with a brass lattice, used by the decorative deck */
+  .card-back {
+    background-color: oklch(0.38 0.06 55);
+    background-image:
+      repeating-linear-gradient(45deg, oklch(0.78 0.12 84 / 0.22) 0 1.5px, transparent 1.5px 6px),
+      repeating-linear-gradient(-45deg, oklch(0.78 0.12 84 / 0.22) 0 1.5px, transparent 1.5px 6px),
+      radial-gradient(80% 80% at 50% 40%, oklch(0.44 0.065 58), oklch(0.32 0.05 52));
+    border: 2px solid oklch(0.72 0.12 82);
+    box-shadow:
+      inset 0 0 0 2px oklch(0.30 0.05 55),
+      0 2px 4px oklch(0 0 0 / 0.45);
+  }
   /* Hide scrollbars on the mobile board track (still scrollable) */
   .scrollbar-hide { scrollbar-width: none; -ms-overflow-style: none; }
   .scrollbar-hide::-webkit-scrollbar { display: none; }

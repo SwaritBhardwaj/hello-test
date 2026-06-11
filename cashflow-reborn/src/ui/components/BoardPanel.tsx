@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { DAYS_IN_MONTH } from '../store';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { DAYS_IN_MONTH, useGameStore } from '../store';
 import { useT } from '../lang';
 import { formatINR } from '@/utils/money';
 import type { TileType } from '@/modules/cards/cards';
 import { Die } from '../art/Die';
 import { Coin, Pawn } from '../art/Pieces';
 import { PercentCount } from '../fx/CountUp';
+
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ============================================================
 // Board panel — oval racetrack (sm+) + compact path (mobile)
@@ -37,9 +40,13 @@ export function BoardPanel(props: BoardProps) {
 
   return (
     <section className="board-cream rounded-game p-3 sm:p-5 relative">
-      <div className="flex items-center justify-between px-1 mb-2">
+      <div className="flex items-center justify-between px-1 mb-2 gap-2">
         <div className="font-display text-ink text-base sm:text-lg">{t('board.month', { n: year * 12 + month })}<span className="text-ink-soft text-sm font-sans"> · {t('board.day', { d: dayPosition, total: DAYS_IN_MONTH })}</span></div>
-        <div className="text-xs uppercase tracking-widest text-ink font-display font-semibold">{t('board.marketSuffix', { phase: t(`phase.${phase}` as 'phase.expansion') })}</div>
+        <div className="flex items-center gap-2">
+          <PhaseChip phase={phase} label={t('board.marketSuffix', { phase: t(`phase.${phase}` as 'phase.expansion') })} />
+          {/* tiny deck on the mobile header row — the oval center hosts the desktop one */}
+          <span className="sm:hidden"><CardDeck small /></span>
+        </div>
       </div>
 
       {/* Oval racetrack — desktop / tablet */}
@@ -89,6 +96,62 @@ export function OvalBoard({ dayPosition, cellTypes, lastRoll, rolling, canRoll, 
         <Medallion coverage={coverage} won={won} passive={passive} expenses={expenses}
           lastRoll={lastRoll} rolling={rolling} canRoll={canRoll} onRoll={onRoll} nextType={nextType} />
       </div>
+      {/* Decorative face-down draw pile, beside the medallion */}
+      <div className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: '22%', top: '60%' }}>
+        <CardDeck />
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------
+// Market-phase chip — colored dot + direction glyph
+// ------------------------------------------------------------
+const PHASE_META: Record<string, { dot: string; up: boolean }> = {
+  expansion: { dot: 'oklch(0.60 0.13 158)', up: true },
+  recovery: { dot: 'oklch(0.66 0.13 150)', up: true },
+  peak: { dot: 'oklch(0.78 0.13 84)', up: true },
+  contraction: { dot: 'oklch(0.55 0.07 235)', up: false },
+  trough: { dot: 'oklch(0.45 0.06 250)', up: false },
+};
+
+export function PhaseChip({ phase, label }: { phase: string; label: string }) {
+  const m = PHASE_META[phase] ?? PHASE_META.expansion;
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-card px-2 py-1 ring-1 ring-[oklch(0.34_0.04_50)/0.35] shadow-sm">
+      <span className="h-2 w-2 rounded-full shrink-0" style={{ background: m.dot, boxShadow: `0 0 5px ${m.dot}` }} aria-hidden />
+      <span className="text-2xs uppercase tracking-widest text-ink font-display font-semibold whitespace-nowrap">{label}</span>
+      <span className={`leading-none ${m.up ? 'text-income-ink' : 'text-expense-ink'}`} style={{ fontSize: 9 }} aria-hidden>{m.up ? '▲' : '▼'}</span>
+    </span>
+  );
+}
+
+// ------------------------------------------------------------
+// Decorative face-down draw pile — top card lifts while a card is open
+// ------------------------------------------------------------
+export function CardDeck({ small }: { small?: boolean }) {
+  const active = useGameStore((s) => !!s.currentCard);
+  const w = small ? 20 : 44;
+  const h = small ? 27 : 60;
+  return (
+    <div aria-hidden className="relative pointer-events-none" style={{ width: w + 10, height: h + 10 }}>
+      {[0, 1, 2].map((i) => {
+        const top = i === 2;
+        return (
+          <div
+            key={i}
+            className="card-back absolute rounded-md"
+            style={{
+              width: w,
+              height: h,
+              left: i * 2,
+              top: 8 - i * 3,
+              transform: top && active ? 'translateY(-22%) rotate(-9deg)' : `rotate(${(i - 1) * 2}deg)`,
+              transition: 'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -210,22 +273,86 @@ export function Medallion({ coverage, won, passive, expenses, lastRoll, rolling,
   );
 }
 
-/** Circular progress ring around the medallion — the win condition, made central. */
+/** Circular progress ring around the medallion — the win condition, made central.
+ *  Gradient brass→green stroke with a soft glow that pulses on progress, brass
+ *  milestone dots at 25/50/75 that light up, and a one-shot burst on crossing. */
 export function FreedomRing({ pct, won, size, children }: { pct: number; won: boolean; size: number; children: React.ReactNode }) {
+  const gradId = useId();
   const r = size / 2 - 9;
   const c = 2 * Math.PI * r;
-  const color = won ? 'oklch(0.82 0.13 88)' : pct >= 75 ? 'oklch(0.74 0.17 150)' : pct >= 40 ? 'oklch(0.82 0.16 92)' : 'oklch(0.70 0.16 50)';
+  const offset = c - (Math.min(100, pct) / 100) * c;
+  const prevPctRef = useRef(pct);
+  const [pulseKey, setPulseKey] = useState(0);
+  const [burst, setBurst] = useState<number | null>(null);
+
+  // Detect progress: pulse the glow on any increase, burst on milestone cross.
+  useEffect(() => {
+    const prev = prevPctRef.current;
+    prevPctRef.current = pct;
+    if (pct <= prev + 0.05 || prefersReducedMotion()) return;
+    setPulseKey((k) => k + 1);
+    const crossed = [25, 50, 75].find((m) => prev < m && pct >= m);
+    if (crossed != null) setBurst(crossed);
+  }, [pct]);
+
+  const milestonePos = (m: number) => {
+    const a = (m / 100) * 2 * Math.PI;
+    return { x: size / 2 + r * Math.cos(a), y: size / 2 + r * Math.sin(a) };
+  };
+
   return (
     <div className="relative grid place-items-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="absolute inset-0 -rotate-90" aria-hidden>
+      <svg width={size} height={size} className="absolute inset-0 -rotate-90 overflow-visible" aria-hidden>
+        <defs>
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="oklch(0.80 0.12 86)" />
+            <stop offset="55%" stopColor="oklch(0.78 0.14 120)" />
+            <stop offset="100%" stopColor="oklch(0.72 0.17 152)" />
+          </linearGradient>
+        </defs>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="oklch(0.30 0.04 158)" strokeWidth="10" />
-        <motion.circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round"
-          strokeDasharray={c} initial={false} animate={{ strokeDashoffset: c - (Math.min(100, pct) / 100) * c }}
+        {/* Soft outer glow under-stroke — blurred copy of the progress arc.
+            Remounts per pulseKey so each gain replays a brighten-then-settle pulse. */}
+        <motion.circle
+          key={`glow-${pulseKey}`}
+          cx={size / 2} cy={size / 2} r={r} fill="none"
+          stroke={`url(#${gradId})`} strokeWidth={13} strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={offset}
+          style={{ filter: 'blur(5px)' }}
+          initial={{ opacity: won ? 0.65 : 0.3 }}
+          animate={pulseKey > 0 && !won ? { opacity: [0.3, 0.85, 0.3] } : { opacity: won ? 0.65 : 0.3 }}
+          transition={{ duration: 1.1, ease: 'easeInOut' }}
+        />
+        <motion.circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={`url(#${gradId})`} strokeWidth="10" strokeLinecap="round"
+          strokeDasharray={c} initial={false} animate={{ strokeDashoffset: offset }}
           transition={{ type: 'spring', stiffness: 90, damping: 20 }} />
-        {[0, 25, 50, 75].map((m) => {
-          const a = (m / 100) * 2 * Math.PI;
-          return <circle key={m} cx={size / 2 + r * Math.cos(a)} cy={size / 2 + r * Math.sin(a)} r="2.5" fill="oklch(0.95 0.04 88)" />;
+        {/* Brass milestone dots — light up once passed */}
+        {[25, 50, 75].map((m) => {
+          const { x, y } = milestonePos(m);
+          const lit = pct >= m;
+          return (
+            <circle key={m} cx={x} cy={y} r={lit ? 3.4 : 2.5}
+              fill={lit ? 'oklch(0.88 0.13 88)' : 'oklch(0.46 0.04 130)'}
+              stroke={lit ? 'oklch(0.97 0.05 88)' : 'oklch(0.30 0.04 158)'} strokeWidth={1}
+              style={lit ? { filter: 'drop-shadow(0 0 4px oklch(0.85 0.14 88 / 0.9))' } : undefined}
+            />
+          );
         })}
+        {/* One-shot radial burst at a freshly crossed milestone */}
+        <AnimatePresence>
+          {burst != null && (
+            <motion.circle
+              key={`burst-${burst}`}
+              cx={milestonePos(burst).x} cy={milestonePos(burst).y} r={5}
+              fill="none" stroke="oklch(0.90 0.12 90)" strokeWidth={2.5}
+              style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+              initial={{ opacity: 0.95, scale: 0.4 }}
+              animate={{ opacity: 0, scale: 4.5 }}
+              transition={{ duration: 0.9, ease: 'easeOut' }}
+              onAnimationComplete={() => setBurst(null)}
+            />
+          )}
+        </AnimatePresence>
       </svg>
       <div className="rounded-full grid place-items-center" style={{ width: size - 30, height: size - 30, background: 'radial-gradient(circle at 50% 35%, oklch(0.30 0.055 158), oklch(0.22 0.045 158))', boxShadow: 'inset 0 2px 10px oklch(0 0 0 / 0.5), 0 0 0 3px oklch(0.34 0.04 50)' }}>{children}</div>
     </div>
