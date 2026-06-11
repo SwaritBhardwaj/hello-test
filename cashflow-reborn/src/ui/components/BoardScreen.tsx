@@ -17,7 +17,7 @@ import { AchievementToasts } from './AchievementToasts';
 import { ChallengeToasts } from './TrophiesPanel';
 import { CoachSprite } from './CoachSprite';
 import { PaydayModal } from './PaydayModal';
-import { ImpactToast } from './ImpactToast';
+import { ImpactToast, RollMoneyToasts } from './ImpactToast';
 
 // ============================================================
 // Main board
@@ -77,6 +77,7 @@ export function BoardScreen() {
       <ChallengeToasts />
       <CoachSprite />
       <ImpactToast />
+      <RollMoneyToasts />
       <div className="relative mx-auto max-w-5xl px-3 sm:px-5 py-3 sm:py-4 space-y-3">
         {/* HUD bar — identity + money pills + controls, edge-docked & high-contrast */}
         <HudBar onOpenSheet={() => setSheetOpen(true)} />

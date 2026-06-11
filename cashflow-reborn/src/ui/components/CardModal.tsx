@@ -38,12 +38,15 @@ export function CardModal({ card }: { card: Card }) {
   return (
     <ModalShell labelledBy="card-title">
       <div className="relative w-full sm:max-w-md">
-      {/* Coach peeks over the card's top edge — bottom half hides behind the card (z-0 vs z-10) */}
+      {/* Coach presence: on mobile he peeks over the card's top edge — raised
+          enough that his spectacles and eyes clear the rim (the chin hides
+          behind the card, z-0 vs z-10). On desktop there's open felt beside
+          the card, so he sits there fully visible instead of being clipped. */}
       {peek && (
         <motion.div
           initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.3, type: 'spring', stiffness: 300, damping: 20 }}
-          className="absolute -top-[26px] right-7 z-0" aria-hidden
+          className="absolute -top-[40px] right-7 z-0 sm:top-2 sm:-right-[78px]" aria-hidden
         >
           <CoachMascot mood={t >= 4 ? 'worried' : 'happy'} size={64} />
         </motion.div>

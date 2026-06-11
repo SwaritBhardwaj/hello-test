@@ -223,6 +223,11 @@ export const UI = {
   'intervention.ccBailout': { en: 'Swiping the card again? Your last credit-card bailout charged ~42% a year for the privilege. Still sure?', hi: 'फिर कार्ड स्वाइप? पिछली बार क्रेडिट कार्ड ने ~42% सालाना ब्याज लिया था। पक्का है?' },
   'intervention.fomoBuy': { en: 'Buying at the top of the cycle — your last peak buy went underwater. Markets were cheaper when you were scared. Still sure?', hi: 'चक्र के शिखर पर खरीद रहे हैं — पिछली बार की पीक खरीद डूब गई थी। जब डर था, बाज़ार सस्ता था। पक्का है?' },
 
+  // Per-roll money toasts
+  'roll.day': { en: 'Day {d}', hi: 'दिन {d}' },
+  'roll.quiet': { en: 'Quiet stretch — wallet untouched ✓', hi: 'शांत दिन — जेब को कुछ नहीं हुआ ✓' },
+  'roll.more': { en: '+{n} more in the log', hi: 'लॉग में +{n} और' },
+
   // Counterfactual debrief
   'debrief.title': { en: 'Coach debrief — what if?', hi: 'कोच समीक्षा — क्या होता अगर?' },
   'debrief.soldDownturn': { en: 'Sold {label} in a downturn', hi: 'मंदी में {label} बेचा' },

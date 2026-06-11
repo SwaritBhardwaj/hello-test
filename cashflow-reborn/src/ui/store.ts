@@ -148,6 +148,9 @@ interface GameStore {
   moneyEvents: AppliedMoneyEvent[];
   /** Net signed preview amount currently applied to cashOnHand; reverted before each tick. */
   previewAppliedTotal: number;
+  /** What the last roll crossed — drives the per-roll money toasts. `quiet`
+   *  means nothing at all happened (no events, no cards, no month close). */
+  lastRollFx: { uid: number; events: AppliedMoneyEvent[]; quiet: boolean } | null;
   // Payday moment
   pendingPayday: PaydaySummary | null;
   // Decision impact toast
@@ -188,6 +191,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   monthPlan: null,
   moneyEvents: [],
   previewAppliedTotal: 0,
+  lastRollFx: null,
   pendingPayday: null,
   lastImpact: null,
   counterfactualLog: [],
@@ -215,6 +219,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       monthPlan: buildMonthPlan(state, planSeedFor(state)),
       moneyEvents: [],
       previewAppliedTotal: 0,
+      lastRollFx: null,
       pendingPayday: null,
       lastImpact: null,
   counterfactualLog: [],
@@ -305,6 +310,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
         monthPlan: buildMonthPlan(result.state, planSeedFor(result.state)),
         moneyEvents,
         previewAppliedTotal: 0,
+        // Month close has its own moment (payday modal) — never "quiet".
+        lastRollFx: { uid: Date.now(), events: appliedEntries, quiet: false },
         pendingPayday: payday,
       });
     } else {
@@ -317,6 +324,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         isRolling: false,
         moneyEvents,
         previewAppliedTotal: previewTotal,
+        lastRollFx: {
+          uid: Date.now(),
+          events: appliedEntries,
+          quiet: appliedEntries.length === 0 && crossed.length === 0,
+        },
       });
     }
 
@@ -545,6 +557,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       monthPlan: null,
       moneyEvents: [],
       previewAppliedTotal: 0,
+      lastRollFx: null,
       pendingPayday: null,
       lastImpact: null,
   counterfactualLog: [],
