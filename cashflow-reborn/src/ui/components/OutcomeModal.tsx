@@ -8,6 +8,7 @@ import { useProgression } from '../progression';
 import type { RunScore } from '@/modules/progression/score';
 import { bestEscape } from '@/modules/progression/storage';
 import { ModalShell, PrimaryButton } from './primitives';
+import { evaluateCounterfactuals, type CounterfactualResult } from '@/modules/coach/counterfactual';
 import { ShareResult } from './ShareCard';
 import { CoachMascot } from '../art/Coach';
 import { COACH_FLAGS } from '@/data/coachFlags';
@@ -23,6 +24,7 @@ export function OutcomeModal({ status }: { status: 'won' | 'lost' }) {
   const score = useProgression((s) => s.lastScore);
   const unlocked = useProgression((s) => s.unlocked);
   const state = useGameStore((s) => s.state)!;
+  const cfLog = useGameStore((s) => s.counterfactualLog);
   const years = Math.floor(state.meta.tick / 12);
   const months = state.meta.tick % 12;
   const won = status === 'won';
@@ -58,6 +60,7 @@ export function OutcomeModal({ status }: { status: 'won' | 'lost' }) {
         </div>
         <div className="p-5 sm:p-6 space-y-4 overflow-y-auto">
           {score && <Scorecard score={score} unlockedCount={unlocked.length} />}
+          {COACH_FLAGS.counterfactuals && <CoachDebrief records={cfLog} endTick={state.meta.tick} />}
           <div className="rounded-lg bg-card-edge/50 p-3 space-y-1 text-sm tnum">
             <ResultRow label={t('hud.netWorth')} value={formatINR(state.statement.netWorth)} tone={state.statement.netWorth >= 0 ? 'income' : 'expense'} />
             {won && <ResultRow label={t('outcome.passiveIncome')} value={`${formatINR(state.statement.passiveIncome)}/mo`} tone="income" />}
@@ -106,4 +109,41 @@ export function Scorecard({ score, unlockedCount }: { score: RunScore; unlockedC
 export function ResultRow({ label, value, tone }: { label: string; value: string; tone?: 'income' | 'expense' }) {
   const c = tone === 'income' ? 'text-income-ink' : tone === 'expense' ? 'text-expense-ink' : 'text-ink';
   return <div className="flex justify-between"><span className="text-ink-soft">{label}</span><span className={`font-semibold ${c}`}>{value}</span></div>;
+}
+
+// ============================================================
+// Coach debrief — deterministic "what if" replays of your most
+// debatable calls, shown only when the gap was meaningful.
+// ============================================================
+function CoachDebrief({ records, endTick }: { records: import('@/modules/coach/counterfactual').CounterfactualRecord[]; endTick: number }) {
+  const results = useMemo(() => evaluateCounterfactuals(records, endTick), [records, endTick]);
+  if (results.length === 0) return null;
+  return (
+    <div className="rounded-lg ring-1 ring-card-edge overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-2 bg-card-edge/30">
+        <CoachMascot mood="worried" size={24} />
+        <div className="font-display text-ink text-sm">Coach debrief — what if?</div>
+      </div>
+      <div className="divide-y divide-card-edge">
+        {results.map((r) => <DebriefRow key={`${r.tick}-${r.label}`} r={r} />)}
+      </div>
+    </div>
+  );
+}
+
+function DebriefRow({ r }: { r: CounterfactualResult }) {
+  const mistake = r.delta > 0;
+  const what = r.kind === 'panic_sell'
+    ? `Sold ${r.label} in a downturn`
+    : r.kind === 'doodad_loan' ? `Bought ${r.label} on a loan` : `Bought ${r.label}`;
+  const verdict = r.kind === 'panic_sell'
+    ? (mistake ? `Holding would've left you ${formatINR(r.delta, { compact: true })} richer today.` : `Good call — selling saved you ${formatINR(-r.delta, { compact: true })}.`)
+    : (mistake ? `Skipping it would've left you ${formatINR(r.delta, { compact: true })} richer today.` : `It worked out — you're ${formatINR(-r.delta, { compact: true })} ahead.`);
+  return (
+    <div className="px-3 py-2 text-sm">
+      <div className="text-2xs uppercase tracking-wide text-ink-faint tnum">Month {r.tick}</div>
+      <div className="text-ink font-medium leading-snug">{what}</div>
+      <div className={`text-xs leading-snug mt-0.5 font-semibold ${mistake ? 'text-expense-ink' : 'text-income-ink'}`}>{verdict}</div>
+    </div>
+  );
 }

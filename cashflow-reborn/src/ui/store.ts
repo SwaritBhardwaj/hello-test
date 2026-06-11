@@ -14,6 +14,9 @@ import {
   type AppliedMoneyEvent,
 } from '@/modules/calendar/monthPlan';
 import { formatINR } from '@/utils/money';
+import { tr } from '@/i18n/loc';
+import { COACH_FLAGS } from '@/data/coachFlags';
+import { MAX_COUNTERFACTUAL_RECORDS, type CounterfactualRecord } from '@/modules/coach/counterfactual';
 
 export type { MonthPlan, MoneyEvent, AppliedMoneyEvent } from '@/modules/calendar/monthPlan';
 
@@ -149,6 +152,8 @@ interface GameStore {
   pendingPayday: PaydaySummary | null;
   // Decision impact toast
   lastImpact: DecisionImpact | null;
+  /** (before, after) state pairs for the run-end counterfactual debrief. */
+  counterfactualLog: CounterfactualRecord[];
   // Actions
   initGame: (opts: SetupOptions) => void;
   toggleCoachMode: () => void;
@@ -185,6 +190,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   previewAppliedTotal: 0,
   pendingPayday: null,
   lastImpact: null,
+  counterfactualLog: [],
 
   toggleCoachMode: () => {
     const next = !get().coachMode;
@@ -211,6 +217,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       previewAppliedTotal: 0,
       pendingPayday: null,
       lastImpact: null,
+  counterfactualLog: [],
     });
   },
 
@@ -339,6 +346,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       marketPhase: cloned.market.phase,
       category: categorize(s.currentCard, optionId),
     };
+    const cf = COACH_FLAGS.counterfactuals && s.currentCard.kind === 'doodad' && optionId !== 'skip'
+      ? [...s.counterfactualLog, {
+          tick: s.state.meta.tick,
+          kind: 'doodad' as const,
+          label: tr(s.currentCard.title, 'en'),
+          before: s.state,
+          after: cloned,
+        }].slice(-MAX_COUNTERFACTUAL_RECORDS)
+      : s.counterfactualLog;
     set({
       state: cloned,
       notifications: [...s.notifications, `🃏 ${note}`].slice(-25),
@@ -346,6 +362,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameStatus: evaluateGameStatus(cloned, s.gameStatus),
       decisionLog: [...s.decisionLog, entry],
       lastImpact: computeImpact(s.state, cloned) ?? s.lastImpact,
+      counterfactualLog: cf,
     });
     // Draw next pending if any
     setTimeout(() => drawNextCard(), 200);
@@ -383,6 +400,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
       marketPhase: cloned.market.phase,
       category: categorize(s.currentCard, optionId),
     };
+    const cf = COACH_FLAGS.counterfactuals && s.currentCard.kind === 'doodad'
+      ? [...s.counterfactualLog, {
+          tick: s.state.meta.tick,
+          kind: 'doodad_loan' as const,
+          label: tr(s.currentCard.title, 'en'),
+          before: s.state,
+          after: cloned,
+        }].slice(-MAX_COUNTERFACTUAL_RECORDS)
+      : s.counterfactualLog;
     set({
       state: cloned,
       notifications: [
@@ -394,6 +420,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameStatus: evaluateGameStatus(cloned, s.gameStatus),
       decisionLog: [...s.decisionLog, entry],
       lastImpact: computeImpact(s.state, cloned) ?? s.lastImpact,
+      counterfactualLog: cf,
     });
     setTimeout(() => drawNextCard(), 200);
   },
@@ -479,12 +506,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
         category: 'sell_asset',
       });
     }
+    const downturn = s.state.market.phase === 'contraction' || s.state.market.phase === 'trough';
+    const soldAsset = action.kind === 'sell_asset' ? s.state.assets.find((a) => a.id === action.assetId) : undefined;
+    const cf = COACH_FLAGS.counterfactuals && soldAsset && downturn
+      ? [...s.counterfactualLog, {
+          tick: s.state.meta.tick,
+          kind: 'panic_sell' as const,
+          label: soldAsset.label,
+          before: s.state,
+          after: cloned,
+        }].slice(-MAX_COUNTERFACTUAL_RECORDS)
+      : s.counterfactualLog;
     set({
       state: cloned,
       notifications: [...s.notifications, note ?? '...'].slice(-25),
       gameStatus: evaluateGameStatus(cloned, s.gameStatus),
       decisionLog: log,
       lastImpact: computeImpact(s.state, cloned) ?? s.lastImpact,
+      counterfactualLog: cf,
     });
   },
 
@@ -508,6 +547,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       previewAppliedTotal: 0,
       pendingPayday: null,
       lastImpact: null,
+  counterfactualLog: [],
     }),
 }));
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { useGameStore } from '../store';
@@ -11,6 +11,7 @@ import { CoachMascot } from '../art/Coach';
 import { play } from '../sound/sound';
 import { ModalShell } from './primitives';
 import { COACH_FLAGS } from '@/data/coachFlags';
+import { cardOptionIntervention, sellIntervention, type Intervention } from '@/modules/coach/interventions';
 
 // ============================================================
 // Card modal
@@ -26,6 +27,11 @@ export function CardModal({ card }: { card: Card }) {
   const visibleOptions = t >= 5 ? card.options.filter((o) => o.id !== 'skip') : card.options;
   const [financeOpen, setFinanceOpen] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
+  const decisionLog = useGameStore((s) => s.decisionLog);
+  // Repeat-mistake guard: first tap arms the button and shows the coach's
+  // callback; second tap proceeds. Reset whenever the card changes.
+  const [armed, setArmed] = useState<string | null>(null);
+  useEffect(() => setArmed(null), [card]);
 
   const peek = COACH_FLAGS.peekOverCard && coachMode && !!card.coachNote;
 
@@ -159,10 +165,16 @@ export function CardModal({ card }: { card: Card }) {
               const warn = o.coachWarning ? L(o.coachWarning) : undefined;
               const warnTone = warn?.startsWith('WORST') ? 'bg-expense-soft text-expense-ink ring-1 ring-expense/50'
                 : warn?.startsWith('Best') ? 'bg-income-soft text-income-ink ring-1 ring-income/50' : 'bg-caution-soft text-caution-ink ring-1 ring-caution/50';
+              const guard = COACH_FLAGS.interventions && !cantAfford
+                ? cardOptionIntervention(state, decisionLog, card, o.id, false) : null;
               return (
                 <div key={o.id} className="space-y-1.5">
                   <button
-                    onClick={() => { if (!cantAfford) { play(isResist ? 'click' : 'coin'); resolve(o.id); } }}
+                    onClick={() => {
+                      if (cantAfford) return;
+                      if (guard && armed !== o.id) { play('pop'); setArmed(o.id); return; }
+                      play(isResist ? 'click' : 'coin'); resolve(o.id);
+                    }}
                     disabled={!!cantAfford}
                     className={[
                       'btn-3d w-full text-left px-4 py-2.5',
@@ -177,15 +189,25 @@ export function CardModal({ card }: { card: Card }) {
                     {o.detail && <div className="text-xs mt-0.5 opacity-80">{L(o.detail)}</div>}
                     {cantAfford && <div className="text-xs text-expense-ink mt-0.5 font-semibold">{cantAfford}</div>}
                   </button>
+                  {guard && armed === o.id && <InterventionNotice guard={guard} />}
                   {coachMode && warn && <div className={`text-xs leading-snug px-3 py-2 rounded ${warnTone}`}>{warn}</div>}
-                  {showBorrow && (
-                    <button onClick={() => { play('coin'); resolveWithLoan(o.id, 'personal'); }} className="btn-3d w-full text-left px-4 py-2.5 bg-expense-soft border-2 border-expense enabled:hover:bg-expense/20">
+                  {showBorrow && (() => {
+                    const borrowGuard = COACH_FLAGS.interventions
+                      ? cardOptionIntervention(state, decisionLog, card, o.id, true) : null;
+                    const borrowId = `borrow:${o.id}`;
+                    return (<>
+                    <button onClick={() => {
+                      if (borrowGuard && armed !== borrowId) { play('pop'); setArmed(borrowId); return; }
+                      play('coin'); resolveWithLoan(o.id, 'personal');
+                    }} className="btn-3d w-full text-left px-4 py-2.5 bg-expense-soft border-2 border-expense enabled:hover:bg-expense/20">
                       <div className="text-sm font-display font-bold text-expense-ink flex items-center gap-1.5">
                         <Coin size={15} /> {ui('card.borrowBuy', { x: borrowAmount.toLocaleString('en-IN') })} {t >= 5 && <span className="ml-1 text-xs bg-expense text-card rounded px-1.5 py-0.5 font-bold">{ui('card.forced')}</span>}
                       </div>
                       <div className="text-xs text-expense-ink font-medium mt-0.5">{ui('card.personalLoanTerms')}</div>
                     </button>
-                  )}
+                    {borrowGuard && armed === borrowId && <InterventionNotice guard={borrowGuard} />}
+                    </>);
+                  })()}
                 </div>
               );
             })}
@@ -201,6 +223,9 @@ export function CardModal({ card }: { card: Card }) {
 // ============================================================
 export function CardFinancePanel({ state, applyAction }: { state: ReturnType<typeof useGameStore.getState>['state']; applyAction: (a: import('@/types').DecisionAction) => void }) {
   const { t } = useT();
+  const decisionLog = useGameStore((s) => s.decisionLog);
+  const [armedSell, setArmedSell] = useState<string | null>(null);
+  const sellGuard = COACH_FLAGS.interventions && state ? sellIntervention(state, decisionLog) : null;
   const [borrowTab, setBorrowTab] = useState(false);
   const [borrowLakhs, setBorrowLakhs] = useState(2);
   const [borrowMonths, setBorrowMonths] = useState(36);
@@ -253,15 +278,21 @@ export function CardFinancePanel({ state, applyAction }: { state: ReturnType<typ
                 const val = a.currentPrice * a.units;
                 const gain = val - a.unitCost * a.units;
                 return (
-                  <div key={a.id} className="flex items-center justify-between gap-2 py-1 border-b border-card-edge last:border-0">
+                  <div key={a.id} className="py-1 border-b border-card-edge last:border-0">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-semibold text-ink truncate">{a.label}</div>
                       <div className={`text-xs tnum ${gain >= 0 ? 'text-income-ink' : 'text-expense-ink'}`}>{formatINR(val, { compact: true })} ({gain >= 0 ? '+' : ''}{formatINR(gain, { compact: true })})</div>
                     </div>
                     <button
-                      onClick={() => applyAction({ kind: 'sell_asset', assetId: a.id, units: a.units })}
+                      onClick={() => {
+                        if (sellGuard && armedSell !== a.id) { play('pop'); setArmedSell(a.id); return; }
+                        applyAction({ kind: 'sell_asset', assetId: a.id, units: a.units });
+                      }}
                       className="btn-3d shrink-0 bg-expense-soft text-expense-ink text-xs px-2 py-1"
                     >{t('fin.sellAll')}</button>
+                  </div>
+                  {sellGuard && armedSell === a.id && <div className="mt-1"><InterventionNotice guard={sellGuard} /></div>}
                   </div>
                 );
               })}
@@ -320,5 +351,25 @@ export function CardFinancePanel({ state, applyAction }: { state: ReturnType<typ
         </div>
       )}
     </div>
+  );
+}
+
+// ============================================================
+// Coach intervention notice — shown under an "armed" button; the
+// action only fires on the second tap. Shared with the balance sheet.
+// ============================================================
+export function InterventionNotice({ guard }: { guard: Intervention }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+      className="flex items-start gap-2 rounded-lg bg-caution-soft ring-2 ring-caution px-3 py-2"
+      role="alert"
+    >
+      <CoachMascot mood="worried" size={26} />
+      <div className="min-w-0 text-xs leading-snug">
+        <div className="text-caution-ink font-semibold">{guard.message}</div>
+        <div className="text-ink-soft mt-0.5 font-medium">Tap again if you're sure.</div>
+      </div>
+    </motion.div>
   );
 }

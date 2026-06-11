@@ -19,4 +19,11 @@ export const COACH_FLAGS = {
   /** The illustrated "Buddy" character is available (and default) in the
    *  style picker. Off: coin/owl only, as before. */
   characterArtV2: true,
+  /** Coach steps in front of repeat mistakes (panic-sell, borrow-for-doodad,
+   *  CC bailout, peak FOMO buy) and asks for one confirming tap.
+   *  Off: buttons act immediately, as before. */
+  interventions: true,
+  /** Record (before, after) snapshots of debatable decisions and show a
+   *  "what if" coach debrief on the outcome screen. Off: no debrief. */
+  counterfactuals: true,
 } as const;

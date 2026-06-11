@@ -10,6 +10,9 @@ import type { Loan, Asset, LoanKind } from '@/types';
 import { Coin } from '../art/Pieces';
 import { play } from '../sound/sound';
 import { ModalShell, PrimaryButton, Field, Select, Row } from './primitives';
+import { COACH_FLAGS } from '@/data/coachFlags';
+import { sellIntervention } from '@/modules/coach/interventions';
+import { InterventionNotice } from './CardModal';
 
 // ============================================================
 // Balance sheet (bottom sheet on mobile, side drawer on desktop)
@@ -193,6 +196,15 @@ export function LedgerSubhead({ children }: { children: React.ReactNode }) {
 export function AssetsTab({ onSell }: { onSell: (a: Asset, units: number) => void }) {
   const { t } = useT();
   const state = useGameStore((s) => s.state)!;
+  const decisionLog = useGameStore((s) => s.decisionLog);
+  // Repeat-mistake guard: first tap arms, second tap sells (armed key = assetId:units).
+  const [armedSell, setArmedSell] = useState<string | null>(null);
+  const sellGuard = COACH_FLAGS.interventions ? sellIntervention(state, decisionLog) : null;
+  function guardedSell(a: Asset, units: number) {
+    const key = `${a.id}:${units}`;
+    if (sellGuard && armedSell !== key) { play('pop'); setArmedSell(key); return; }
+    play('coin'); onSell(a, units);
+  }
   if (state.assets.length === 0) {
     return (
       <div className="text-center py-10 text-ink-faint">
@@ -218,9 +230,10 @@ export function AssetsTab({ onSell }: { onSell: (a: Asset, units: number) => voi
             </div>
             <div className="text-2xs text-ink-soft mt-1 tnum">{a.units} units @ ₹{a.currentPrice.toLocaleString('en-IN')} · Yield ₹{Math.round(monthlyYield).toLocaleString('en-IN')}/mo</div>
             <div className="flex gap-2 mt-2">
-              <button onClick={() => { play('coin'); onSell(a, a.units); }} className="text-2xs bg-expense-soft hover:bg-expense/20 text-expense-ink px-3 py-1 rounded font-display">{t('fin.sellAll')}</button>
-              {a.units > 1 && <button onClick={() => { play('coin'); onSell(a, Math.floor(a.units / 2)); }} className="text-2xs bg-caution-soft hover:bg-caution/20 text-caution-ink px-3 py-1 rounded font-display">{t('fin.sellHalf')}</button>}
+              <button onClick={() => guardedSell(a, a.units)} className="text-2xs bg-expense-soft hover:bg-expense/20 text-expense-ink px-3 py-1 rounded font-display">{t('fin.sellAll')}</button>
+              {a.units > 1 && <button onClick={() => guardedSell(a, Math.floor(a.units / 2))} className="text-2xs bg-caution-soft hover:bg-caution/20 text-caution-ink px-3 py-1 rounded font-display">{t('fin.sellHalf')}</button>}
             </div>
+            {sellGuard && armedSell?.startsWith(`${a.id}:`) && <div className="mt-2"><InterventionNotice guard={sellGuard} /></div>}
           </div>
         );
       })}
