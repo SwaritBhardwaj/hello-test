@@ -10,6 +10,7 @@ import { Coin } from '../art/Pieces';
 import { CoachMascot } from '../art/Coach';
 import { play } from '../sound/sound';
 import { ModalShell } from './primitives';
+import { COACH_FLAGS } from '@/data/coachFlags';
 
 // ============================================================
 // Card modal
@@ -26,13 +27,26 @@ export function CardModal({ card }: { card: Card }) {
   const [financeOpen, setFinanceOpen] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
 
+  const peek = COACH_FLAGS.peekOverCard && coachMode && !!card.coachNote;
+
   return (
     <ModalShell labelledBy="card-title">
+      <div className="relative w-full sm:max-w-md">
+      {/* Coach peeks over the card's top edge — bottom half hides behind the card (z-0 vs z-10) */}
+      {peek && (
+        <motion.div
+          initial={{ y: 18, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.3, type: 'spring', stiffness: 300, damping: 20 }}
+          className="absolute -top-[26px] right-7 z-0" aria-hidden
+        >
+          <CoachMascot mood={t >= 4 ? 'worried' : 'happy'} size={52} />
+        </motion.div>
+      )}
       <motion.div
         initial={{ opacity: 0, rotateY: 90, scale: 0.96 }} animate={{ opacity: 1, rotateY: 0, scale: 1 }} exit={{ opacity: 0, y: 24, scale: 0.96 }}
         transition={{ type: 'spring', stiffness: 220, damping: 22 }}
         style={{ transformPerspective: 1200 }}
-        className="paper w-full sm:max-w-md rounded-t-game sm:rounded-game shadow-card ring-4 ring-brass/50 overflow-hidden max-h-[92dvh] flex flex-col"
+        className="relative z-10 paper w-full rounded-t-game sm:rounded-game shadow-card ring-4 ring-brass/50 overflow-hidden max-h-[92dvh] flex flex-col"
       >
         <div className="bg-wood-700 text-card px-5 py-3 flex items-center gap-3">
           <span className="text-3xl" aria-hidden>{card.emoji}</span>
@@ -58,6 +72,21 @@ export function CardModal({ card }: { card: Card }) {
 
         {/* Scrollable body — context only; decisions live in the sticky footer below */}
         <div className="p-4 sm:p-5 space-y-2.5 overflow-y-auto flex-1 min-h-0">
+          {peek && (
+            /* Speech bubble from the peeking coach — tail points up toward him */
+            <button
+              onClick={() => setCoachOpen((o) => !o)}
+              aria-expanded={coachOpen}
+              className="relative w-full text-left rounded-2xl bg-income-soft px-3 py-2 text-sm leading-snug ring-1 ring-income/40"
+            >
+              <span className="absolute -top-[7px] right-9 w-3.5 h-3.5 rotate-45 bg-income-soft border-l border-t border-income/40 rounded-tl-sm" aria-hidden />
+              <div className="flex items-start gap-1.5">
+                <span className="text-2xs uppercase tracking-widest font-display text-income-ink/80 mt-0.5 shrink-0">{ui('coach.label')}</span>
+                <p className={`flex-1 min-w-0 text-income-ink ${coachOpen ? 'leading-relaxed' : 'line-clamp-2'}`}>{L(card.coachNote!)}</p>
+                <ChevronDown size={16} className={`shrink-0 mt-0.5 text-income-ink/70 transition-transform ${coachOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+          )}
           <p className="text-[15px] sm:text-base text-ink leading-relaxed">{L(card.description)}</p>
           {card.rows && (
             <div className="rounded-lg bg-card-edge p-3 text-sm space-y-1.5 ring-1 ring-[oklch(0.34_0.04_50)/0.15]">
@@ -69,8 +98,8 @@ export function CardModal({ card }: { card: Card }) {
               ))}
             </div>
           )}
-          {coachMode && card.coachNote && (
-            /* Coach note collapses to one line — tap to expand */
+          {!peek && coachMode && card.coachNote && (
+            /* Coach note collapses to one line — tap to expand (pre-peek fallback) */
             <button
               onClick={() => setCoachOpen((o) => !o)}
               aria-expanded={coachOpen}
@@ -162,6 +191,7 @@ export function CardModal({ card }: { card: Card }) {
             })}
         </div>
       </motion.div>
+      </div>
     </ModalShell>
   );
 }

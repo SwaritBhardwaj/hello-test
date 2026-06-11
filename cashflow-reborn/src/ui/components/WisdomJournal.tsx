@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { X, Lock } from 'lucide-react';
 import { WISDOM, type CoachLesson } from '@/modules/coach/wisdom';
 import { seenLessons, journalStats, subscribeJournal, journalVersion } from '@/modules/coach/journal';
-import { useCoachStyle, setCoachStyle, type CoachStyle } from '../coachStyle';
+import { useCoachStyle, setCoachStyle, availableStyles, type CoachStyle } from '../coachStyle';
 import { CoachMascot } from '../art/Coach';
 import { ModalShell } from './primitives';
 import { play } from '../sound/sound';
@@ -14,10 +14,8 @@ import { play } from '../sound/sound';
 // the player to keep playing. Also hosts the coach style picker.
 // ============================================================
 
-const STYLES: { id: CoachStyle; label: string }[] = [
-  { id: 'coin', label: 'Coin' },
-  { id: 'owl', label: 'Owl' },
-];
+const STYLE_LABELS: Record<CoachStyle, string> = { buddy: 'Buddy', coin: 'Coin', owl: 'Owl' };
+const STYLES: { id: CoachStyle; label: string }[] = availableStyles().map((id) => ({ id, label: STYLE_LABELS[id] }));
 
 export function WisdomJournal({ onClose }: { onClose: () => void }) {
   // Re-render when a new lesson is recorded while the modal is open.

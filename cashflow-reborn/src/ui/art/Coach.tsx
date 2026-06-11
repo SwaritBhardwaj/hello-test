@@ -19,7 +19,9 @@ const CREAM = 'oklch(0.95 0.04 88)';
 export function CoachMascot({ mood, size = 28, styleOverride }: { mood: CoachMood; size?: number; styleOverride?: CoachStyle }) {
   const [style] = useCoachStyle();
   const which = styleOverride ?? style;
-  return which === 'owl' ? <OwlFace mood={mood} size={size} /> : <CoinFace mood={mood} size={size} />;
+  if (which === 'owl') return <OwlFace mood={mood} size={size} />;
+  if (which === 'buddy') return <BuddyFace mood={mood} size={size} />;
+  return <CoinFace mood={mood} size={size} />;
 }
 
 /** A round eye that periodically blinks (SMIL — no CSS needed). */
@@ -99,6 +101,101 @@ function CoinFace({ mood, size }: { mood: CoachMood; size: number }) {
           <Sparkle cx={4.3} cy={3.4} r={2.2} />
           <Sparkle cx={23.8} cy={2.9} r={1.7} />
           <Sparkle cx={26.1} cy={13.4} r={1.3} />
+        </>
+      )}
+    </svg>
+  );
+}
+
+// Buddy palette — warm flat illustration on the table's brass/cream tones.
+const SKIN = 'oklch(0.80 0.07 62)';
+const SKIN_EDGE = 'oklch(0.62 0.08 58)';
+const HAIR = 'oklch(0.30 0.04 50)';
+const KURTA = 'oklch(0.93 0.04 88)';
+const VEST = 'oklch(0.74 0.13 80)';
+const VEST_EDGE = 'oklch(0.58 0.12 76)';
+
+/** "Buddy" — the v2 illustrated mentor: a warm, flat human character that
+ *  sits on the felt like a game piece. Same 5-mood contract as the others. */
+function BuddyFace({ mood, size }: { mood: CoachMood; size: number }) {
+  const browWorry = mood === 'worried' || mood === 'facepalm';
+  return (
+    <svg viewBox="0 0 28 28" width={size} height={size} role="img" aria-label={`coach buddy ${mood}`} className="shrink-0">
+      {/* celebrate: both arms thrown up */}
+      {mood === 'celebrate' && (
+        <>
+          <path d="M5.6 20 Q2.4 16 3.4 10.6" fill="none" stroke={SKIN_EDGE} strokeWidth="2.4" strokeLinecap="round" />
+          <path d="M22.4 20 Q25.6 16 24.6 10.6" fill="none" stroke={SKIN_EDGE} strokeWidth="2.4" strokeLinecap="round" />
+          <circle cx="3.4" cy="10" r="1.7" fill={SKIN} stroke={SKIN_EDGE} strokeWidth="0.8" />
+          <circle cx="24.6" cy="10" r="1.7" fill={SKIN} stroke={SKIN_EDGE} strokeWidth="0.8" />
+        </>
+      )}
+      {/* happy: one hand raised in a wave */}
+      {mood === 'happy' && (
+        <>
+          <path d="M22.6 21 Q25.4 18.4 24.8 13.8" fill="none" stroke={SKIN_EDGE} strokeWidth="2.2" strokeLinecap="round" />
+          <circle cx="24.8" cy="13.2" r="1.6" fill={SKIN} stroke={SKIN_EDGE} strokeWidth="0.8" />
+        </>
+      )}
+      {/* shoulders — brass vest over a cream kurta */}
+      <path d="M4.5 28 C4.5 22.6 8.5 19.6 14 19.6 C19.5 19.6 23.5 22.6 23.5 28 Z" fill={VEST} stroke={VEST_EDGE} strokeWidth="1" />
+      <path d="M10.5 20.2 C11.5 22.4 16.5 22.4 17.5 20.2 L17 27 L11 27 Z" fill={KURTA} stroke={VEST_EDGE} strokeWidth="0.6" />
+      {/* head */}
+      <circle cx="14" cy="11.4" r="8.2" fill={SKIN} stroke={SKIN_EDGE} strokeWidth="1.1" />
+      {/* hair — swept flat top with a side part */}
+      <path d="M6.2 9.8 C6 4.6 10 2.6 14 2.8 C18.4 3 22.2 5.4 21.8 9.4 C19.6 7.4 18.6 6.6 16.6 6.4 C13.4 6.1 9.4 6.8 6.2 9.8 Z" fill={HAIR} />
+      {/* ears */}
+      <circle cx="5.9" cy="11.8" r="1.5" fill={SKIN} stroke={SKIN_EDGE} strokeWidth="0.8" />
+      <circle cx="22.1" cy="11.8" r="1.5" fill={SKIN} stroke={SKIN_EDGE} strokeWidth="0.8" />
+      {/* brows */}
+      {browWorry ? (
+        <>
+          <path d="M8.6 9.6 L12 10.8" stroke={HAIR} strokeWidth="1.2" strokeLinecap="round" />
+          <path d="M19.4 9.6 L16 10.8" stroke={HAIR} strokeWidth="1.2" strokeLinecap="round" />
+        </>
+      ) : (
+        <>
+          <path d="M8.8 9.9 Q10.4 9 12 9.9" fill="none" stroke={HAIR} strokeWidth="1.1" strokeLinecap="round" />
+          <path d="M16 9.9 Q17.6 9 19.2 9.9" fill="none" stroke={HAIR} strokeWidth="1.1" strokeLinecap="round" />
+        </>
+      )}
+      {/* eyes */}
+      {mood === 'celebrate' ? (
+        <>
+          <path d="M8.8 12.6 Q10.4 10.8 12 12.6" fill="none" stroke={HAIR} strokeWidth="1.4" strokeLinecap="round" />
+          <path d="M16 12.6 Q17.6 10.8 19.2 12.6" fill="none" stroke={HAIR} strokeWidth="1.4" strokeLinecap="round" />
+        </>
+      ) : mood === 'facepalm' ? (
+        <path d="M8.8 12.4 L11.8 12.4" stroke={HAIR} strokeWidth="1.3" strokeLinecap="round" />
+      ) : mood === 'idle' ? (
+        <>
+          <BlinkEye cx={10.4} cy={12.3} r={1.3} fill={HAIR} />
+          <BlinkEye cx={17.6} cy={12.3} r={1.3} fill={HAIR} />
+        </>
+      ) : (
+        <>
+          <circle cx="10.4" cy="12.3" r="1.3" fill={HAIR} />
+          <circle cx="17.6" cy="12.3" r="1.3" fill={HAIR} />
+        </>
+      )}
+      {/* mouth */}
+      {mood === 'happy' && <path d="M10.6 15.4 Q14 18.6 17.4 15.4" fill="none" stroke={HAIR} strokeWidth="1.4" strokeLinecap="round" />}
+      {mood === 'idle' && <path d="M11 15.8 Q14 17.6 17 15.8" fill="none" stroke={HAIR} strokeWidth="1.3" strokeLinecap="round" />}
+      {mood === 'worried' && <path d="M11 17.2 Q14 15 17 17.2" fill="none" stroke={HAIR} strokeWidth="1.4" strokeLinecap="round" />}
+      {mood === 'celebrate' && <path d="M10.8 14.8 Q14 19.8 17.2 14.8 Q14 16 10.8 14.8 Z" fill={HAIR} />}
+      {mood === 'facepalm' && <path d="M11.2 17.6 Q14 15.6 16.8 17.6" fill="none" stroke={HAIR} strokeWidth="1.4" strokeLinecap="round" />}
+      {/* facepalm: hand over the right eye */}
+      {mood === 'facepalm' && (
+        <g transform="rotate(-14 17.6 11.6)">
+          <ellipse cx="17.8" cy="11.4" rx="4.2" ry="3.1" fill={SKIN} stroke={SKIN_EDGE} strokeWidth="0.9" />
+          <path d="M15 10 L20.6 10 M14.8 11.4 L21 11.4 M15.2 12.8 L20.4 12.8" stroke={SKIN_EDGE} strokeWidth="0.55" strokeLinecap="round" opacity="0.7" />
+        </g>
+      )}
+      {/* celebrate: sparkles */}
+      {mood === 'celebrate' && (
+        <>
+          <Sparkle cx={4} cy={4.4} r={2} />
+          <Sparkle cx={24.4} cy={3.6} r={1.6} />
         </>
       )}
     </svg>

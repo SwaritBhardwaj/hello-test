@@ -9,6 +9,8 @@ import type { RunScore } from '@/modules/progression/score';
 import { bestEscape } from '@/modules/progression/storage';
 import { ModalShell, PrimaryButton } from './primitives';
 import { ShareResult } from './ShareCard';
+import { CoachMascot } from '../art/Coach';
+import { COACH_FLAGS } from '@/data/coachFlags';
 
 // ============================================================
 // Outcome modal
@@ -37,7 +39,18 @@ export function OutcomeModal({ status }: { status: 'won' | 'lost' }) {
         className="paper w-full max-w-md rounded-game shadow-card ring-4 ring-brass/30 overflow-hidden max-h-[92dvh] flex flex-col"
       >
         <div className="text-card px-6 py-5 text-center shrink-0" style={{ background: won ? 'linear-gradient(135deg, oklch(0.74 0.13 80), oklch(0.62 0.12 78))' : 'linear-gradient(135deg, oklch(0.45 0.16 26), oklch(0.32 0.12 24))' }}>
-          <div className="text-5xl mb-1">{won ? '★' : '✖'}</div>
+          {COACH_FLAGS.outcomePresence ? (
+            /* The coach shares the moment — cheering your escape, mourning the bust */
+            <motion.div
+              initial={{ scale: 0.6, rotate: -8, opacity: 0 }} animate={{ scale: 1, rotate: 0, opacity: 1 }}
+              transition={{ delay: 0.25, type: 'spring', stiffness: 280, damping: 16 }}
+              className="flex justify-center mb-1"
+            >
+              <CoachMascot mood={won ? 'celebrate' : 'facepalm'} size={56} />
+            </motion.div>
+          ) : (
+            <div className="text-5xl mb-1">{won ? '★' : '✖'}</div>
+          )}
           <div id="outcome-title" className="font-display text-2xl">{won ? t('outcome.won') : t('outcome.lost')}</div>
           <div className="text-sm opacity-95 mt-1">
             {won ? t('outcome.wonSub', { name: state.player.name, y: years, m: months }) : t('outcome.lostSub', { name: state.player.name, n: BANKRUPTCY_GRACE_MONTHS })}

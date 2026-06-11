@@ -6,7 +6,7 @@
 
 const MUTE_KEY = 'cashflow-reborn:muted';
 
-export type SoundName = 'dice' | 'coin' | 'card' | 'win' | 'lose' | 'click' | 'unlock';
+export type SoundName = 'dice' | 'coin' | 'card' | 'win' | 'lose' | 'click' | 'unlock' | 'pop';
 
 let ctx: AudioContext | null = null;
 let muted = typeof localStorage !== 'undefined' ? localStorage.getItem(MUTE_KEY) === '1' : false;
@@ -102,6 +102,10 @@ export function play(name: SoundName): void {
       break;
     case 'click':
       tone(ac, { freq: 420, type: 'square', start: 0, dur: 0.04, gain: 0.07 });
+      break;
+    case 'pop':
+      // soft bubble pop — quick upward sine blip
+      tone(ac, { freq: 520, type: 'sine', start: 0, dur: 0.09, gain: 0.09, slideTo: 760 });
       break;
   }
 }

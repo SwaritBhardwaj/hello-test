@@ -11,6 +11,8 @@ import type { CoachDecisionEntry } from '@/modules/coach/actionLog';
 import type { Card } from '@/modules/cards/cards';
 import { CoachMascot, type CoachMood } from '../art/Coach';
 import { play } from '../sound/sound';
+import { COACH_FLAGS } from '@/data/coachFlags';
+import { formatINR } from '@/utils/money';
 
 // ============================================================
 // Coach sprite — a persistent companion docked at the screen edge.
@@ -53,6 +55,7 @@ export function CoachSprite() {
   const currentCard = useGameStore((s) => s.currentCard);
   const decisionLog = useGameStore((s) => s.decisionLog);
   const lastRoll = useGameStore((s) => s.lastRoll);
+  const pendingPayday = useGameStore((s) => s.pendingPayday);
   const toasts = useProgression((s) => s.toasts);
 
   const [bubble, setBubble] = useState<Bubble | null>(null);
@@ -112,6 +115,73 @@ export function CoachSprite() {
     }, VERDICT_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [decisionLog]);
+
+  // --- Extra reactions (flagged): payday result + freedom milestones.
+  const lastPaydayRef = useRef<typeof pendingPayday>(null);
+  useEffect(() => {
+    if (!COACH_FLAGS.extraReactions) return;
+    if (pendingPayday) {
+      lastPaydayRef.current = pendingPayday;
+      return;
+    }
+    const collected = lastPaydayRef.current;
+    if (!collected) return;
+    lastPaydayRef.current = null;
+    const good = collected.netDelta >= 0;
+    const pose: CoachMood = good ? 'celebrate' : 'worried';
+    const text = good
+      ? `Banked ${formatINR(collected.netDelta, { compact: true })} this month. Keep stacking.`
+      : `Burned ${formatINR(-collected.netDelta, { compact: true })} more than you made. Watch the bleed.`;
+    setFlashPose(pose);
+    setBubble({ kind: 'verdict', text, pose });
+    if (verdictTimer.current) clearTimeout(verdictTimer.current);
+    verdictTimer.current = setTimeout(() => {
+      setFlashPose(null);
+      setBubble((b) => (b && b.kind === 'verdict' ? null : b));
+    }, VERDICT_MS);
+  }, [pendingPayday]);
+
+  const milestoneRef = useRef<{ seed: number; top: number } | null>(null);
+  useEffect(() => {
+    if (!COACH_FLAGS.extraReactions || !state) return;
+    const coverage = state.statement.totalExpenses
+      ? state.statement.passiveIncome / state.statement.totalExpenses : 0;
+    if (!milestoneRef.current || milestoneRef.current.seed !== state.meta.seed) {
+      // New run: start from wherever the run already is, so we only cheer fresh crossings.
+      milestoneRef.current = { seed: state.meta.seed, top: coverage };
+      return;
+    }
+    const prev = milestoneRef.current.top;
+    if (coverage <= prev) return;
+    milestoneRef.current.top = coverage;
+    const crossed = [0.75, 0.5, 0.25].find((m) => prev < m && coverage >= m);
+    if (!crossed) return;
+    const pct = Math.round(crossed * 100);
+    const text = crossed === 0.75
+      ? '75% free. The rat race is losing its grip on you.'
+      : crossed === 0.5
+        ? 'Halfway out! Passive income now covers half your life.'
+        : '25% free — a quarter of your expenses pay for themselves.';
+    setFlashPose('celebrate');
+    setBubble({ kind: 'verdict', text: `${pct}% · ${text}`, pose: 'celebrate' });
+    if (verdictTimer.current) clearTimeout(verdictTimer.current);
+    verdictTimer.current = setTimeout(() => {
+      setFlashPose(null);
+      setBubble((b) => (b && b.kind === 'verdict' ? null : b));
+    }, VERDICT_MS + 1200);
+  }, [state]);
+
+  // --- Bubble pop sound (flagged): one soft pop whenever a bubble appears.
+  const prevBubbleKey = useRef<string | null>(null);
+  useEffect(() => {
+    const key = bubble
+      ? bubble.kind === 'lesson' ? `lesson:${bubble.lesson.id}`
+        : bubble.kind === 'tutorial' ? `tut:${bubble.step}`
+          : `verdict:${bubble.text}`
+      : null;
+    if (key && key !== prevBubbleKey.current && COACH_FLAGS.bubbleSound) play('pop');
+    prevBubbleKey.current = key;
+  }, [bubble]);
 
   // --- Tutorial: three scripted bubbles for brand-new players.
   const tutorialEnabled = useRef<boolean | null>(null);
